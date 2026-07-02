@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'providers/app_state_provider.dart';
 import 'providers/log_provider.dart';
+import 'services/mtproto_service.dart';
 import 'services/proxy_service.dart';
 import 'services/tun_service.dart';
 import 'ui/screens/home_screen.dart';
@@ -20,6 +21,7 @@ class ShadowGateApp extends StatelessWidget {
           create: (_) => AppStateProvider(
             proxyService: ProxyService(),
             tunService: TunService(),
+            mtprotoService: MtprotoProxyService(),
           ),
         ),
         ChangeNotifierProvider(

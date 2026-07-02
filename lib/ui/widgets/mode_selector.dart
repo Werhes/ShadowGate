@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/types.dart';
 import '../theme/app_theme.dart';
 
-/// Виджет выбора режима с красивыми карточками
+/// Виджет выбора режима — Hiddify-стиль с тремя режимами: Proxy / TUN / MTProto
 class ModeSelector extends StatelessWidget {
   final AppMode currentMode;
   final ValueChanged<AppMode> onModeChanged;
@@ -22,8 +22,8 @@ class ModeSelector extends StatelessWidget {
         return Expanded(
           child: Padding(
             padding: EdgeInsets.only(
-              right: mode == AppMode.proxy ? 8 : 0,
-              left: mode == AppMode.tun ? 8 : 0,
+              right: mode != AppMode.values.last ? 8 : 0,
+              left: mode != AppMode.values.first ? 8 : 0,
             ),
             child: _ModeCard(
               mode: mode,
@@ -55,7 +55,7 @@ class _ModeCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: isSelected
               ? LinearGradient(
@@ -76,7 +76,7 @@ class _ModeCard extends StatelessWidget {
           border: Border.all(
             color: isSelected
                 ? AppTheme.primaryColor.withValues(alpha: 0.5)
-                : Colors.white.withValues(alpha: 0.05),
+                : AppTheme.cardBorderColor.withValues(alpha: 0.3),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
@@ -92,8 +92,8 @@ class _ModeCard extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 gradient: isSelected
                     ? AppTheme.primaryGradient
@@ -103,30 +103,38 @@ class _ModeCard extends StatelessWidget {
                           Colors.white.withValues(alpha: 0.05),
                         ],
                       ),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
                 mode.icon,
-                size: 28,
-                color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                size: 24,
+                color: isSelected
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.5),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               mode.label,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 14,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7),
+                color: isSelected
+                    ? AppTheme.textPrimary
+                    : AppTheme.textSecondary,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               mode.description,
               textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 12,
-                color: Colors.white.withValues(alpha: isSelected ? 0.7 : 0.4),
+                fontSize: 10,
+                color: isSelected
+                    ? AppTheme.textSecondary
+                    : AppTheme.textMuted,
               ),
             ),
           ],

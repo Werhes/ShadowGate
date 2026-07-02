@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
 
-/// Тема приложения — тёмная, современная, с градиентами
+/// Тема приложения — Hiddify-стиль: тёмная, Material 3, глянцевые градиенты
 class AppTheme {
   AppTheme._();
 
-  // Цветовая палитра (публичные для доступа извне)
-  static const Color primaryColor = Color(0xFF6C63FF);
-  static const Color secondaryColor = Color(0xFF00D9FF);
-  static const Color accentColor = Color(0xFFFF6B6B);
-  static const Color surfaceColor = Color(0xFF1A1A2E);
-  static const Color backgroundColor = Color(0xFF0F0F23);
-  static const Color cardColor = Color(0xFF16213E);
-  static const Color successColor = Color(0xFF00E676);
-  static const Color warningColor = Color(0xFFFFD740);
-  static const Color errorColor = Color(0xFFFF5252);
+  // Цветовая палитра Hiddify
+  static const Color primaryColor = Color(0xFF8B5CF6);
+  static const Color primaryLight = Color(0xFFA78BFA);
+  static const Color secondaryColor = Color(0xFF06B6D4);
+  static const Color accentColor = Color(0xFFF43F5E);
+  static const Color surfaceColor = Color(0xFF1E1B2E);
+  static const Color backgroundColor = Color(0xFF0F0D1A);
+  static const Color cardColor = Color(0xFF1A1630);
+  static const Color cardBorderColor = Color(0xFF2D2A4A);
+  static const Color successColor = Color(0xFF10B981);
+  static const Color warningColor = Color(0xFFF59E0B);
+  static const Color errorColor = Color(0xFFEF4444);
+  static const Color textPrimary = Color(0xFFF1F0FF);
+  static const Color textSecondary = Color(0xFF9D97B5);
+  static const Color textMuted = Color(0xFF6B6580);
 
   static ThemeData get darkTheme {
     return ThemeData(
@@ -27,19 +32,21 @@ class AppTheme {
         error: errorColor,
         onPrimary: Colors.white,
         onSecondary: Colors.black,
-        onSurface: Colors.white,
+        onSurface: textPrimary,
         onError: Colors.white,
+        primaryContainer: primaryColor.withValues(alpha: 0.15),
+        secondaryContainer: secondaryColor.withValues(alpha: 0.15),
       ),
       appBarTheme: const AppBarTheme(
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
+        foregroundColor: textPrimary,
         titleTextStyle: TextStyle(
-          color: Colors.white,
+          color: textPrimary,
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
+          letterSpacing: 0.5,
         ),
       ),
       cardTheme: CardThemeData(
@@ -47,6 +54,7 @@ class AppTheme {
         color: cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: cardBorderColor.withValues(alpha: 0.5)),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -56,6 +64,13 @@ class AppTheme {
             borderRadius: BorderRadius.circular(16),
           ),
           elevation: 0,
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -68,7 +83,7 @@ class AppTheme {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
-            color: Colors.white.withValues(alpha: 0.1),
+            color: cardBorderColor.withValues(alpha: 0.5),
           ),
         ),
         focusedBorder: OutlineInputBorder(
@@ -86,8 +101,8 @@ class AppTheme {
           horizontal: 20,
           vertical: 16,
         ),
-        labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
-        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+        labelStyle: TextStyle(color: textSecondary),
+        hintStyle: TextStyle(color: textMuted),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -105,26 +120,32 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         backgroundColor: surfaceColor,
         selectedItemColor: primaryColor,
-        unselectedItemColor: Colors.white.withValues(alpha: 0.4),
+        unselectedItemColor: textMuted,
         elevation: 0,
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
       ),
       dividerTheme: DividerThemeData(
-        color: Colors.white.withValues(alpha: 0.1),
+        color: cardBorderColor.withValues(alpha: 0.5),
         thickness: 1,
       ),
       chipTheme: ChipThemeData(
         backgroundColor: cardColor,
         selectedColor: primaryColor.withValues(alpha: 0.3),
-        labelStyle: const TextStyle(color: Colors.white),
+        labelStyle: const TextStyle(color: textPrimary),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
       ),
     );
   }
 
-  /// Градиенты
+  /// Градиенты Hiddify
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [primaryColor, secondaryColor],
     begin: Alignment.topLeft,
@@ -132,41 +153,55 @@ class AppTheme {
   );
 
   static const LinearGradient accentGradient = LinearGradient(
-    colors: [accentColor, Color(0xFFFF8A80)],
+    colors: [accentColor, Color(0xFFFB7185)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient successGradient = LinearGradient(
-    colors: [successColor, Color(0xFF69F0AE)],
+    colors: [successColor, Color(0xFF34D399)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient surfaceGradient = LinearGradient(
-    colors: [surfaceColor, Color(0xFF1A1A3E)],
+    colors: [backgroundColor, surfaceColor],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
 
   static const LinearGradient cardGradient = LinearGradient(
-    colors: [cardColor, Color(0xFF1E2A4A)],
+    colors: [cardColor, Color(0xFF1F1B3A)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient glowGradient = LinearGradient(
+    colors: [
+      primaryColor,
+      secondaryColor,
+      primaryColor,
+    ],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 }
 
-/// Декоративный контейнер с градиентом
-class GradientContainer extends StatelessWidget {
+/// Декоративный контейнер с градиентом и глянцевым эффектом
+class GlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final double borderRadius;
+  final LinearGradient? gradient;
+  final bool hasGlow;
 
-  const GradientContainer({
+  const GlassCard({
     super.key,
     required this.child,
     this.padding,
     this.borderRadius = 20,
+    this.gradient,
+    this.hasGlow = false,
   });
 
   @override
@@ -174,18 +209,33 @@ class GradientContainer extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        gradient: AppTheme.cardGradient,
+        gradient: gradient ?? AppTheme.cardGradient,
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: AppTheme.cardBorderColor.withValues(alpha: 0.5),
         ),
+        boxShadow: hasGlow
+            ? [
+                BoxShadow(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
       child: child,
     );
   }
 }
 
-/// Кнопка с градиентом
+/// Кнопка с градиентом Hiddify
 class GradientButton extends StatelessWidget {
   final String label;
   final IconData? icon;
@@ -193,6 +243,7 @@ class GradientButton extends StatelessWidget {
   final bool isLoading;
   final LinearGradient? gradient;
   final double height;
+  final Color? backgroundColor;
 
   const GradientButton({
     super.key,
@@ -202,6 +253,7 @@ class GradientButton extends StatelessWidget {
     this.isLoading = false,
     this.gradient,
     this.height = 56,
+    this.backgroundColor,
   });
 
   @override
@@ -213,8 +265,12 @@ class GradientButton extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        gradient: onPressed != null ? effectiveGradient : null,
-        color: onPressed == null ? Colors.grey.withValues(alpha: 0.3) : null,
+        gradient: onPressed != null
+            ? effectiveGradient
+            : null,
+        color: onPressed == null
+            ? Colors.grey.withValues(alpha: 0.3)
+            : backgroundColor,
         boxShadow: onPressed != null
             ? [
                 BoxShadow(
@@ -289,17 +345,18 @@ class SectionHeader extends StatelessWidget {
               fontSize: 18,
               fontWeight: FontWeight.bold,
               letterSpacing: 0.5,
+              color: AppTheme.textPrimary,
             ),
           ),
-          ?trailing,
+          if (trailing != null) trailing!,
         ],
       ),
     );
   }
 }
 
-/// Анимированный индикатор статуса
-class StatusIndicator extends StatelessWidget {
+/// Анимированный индикатор статуса с пульсацией
+class StatusIndicator extends StatefulWidget {
   final Color color;
   final double size;
 
@@ -310,21 +367,51 @@ class StatusIndicator extends StatelessWidget {
   });
 
   @override
+  State<StatusIndicator> createState() => _StatusIndicatorState();
+}
+
+class _StatusIndicatorState extends State<StatusIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0.5, end: 1.0).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.5),
-            blurRadius: size,
-            spreadRadius: size / 4,
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Container(
+          width: widget.size,
+          height: widget.size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: widget.color,
+            boxShadow: [
+              BoxShadow(
+                color: widget.color.withValues(alpha: _animation.value * 0.6),
+                blurRadius: widget.size,
+                spreadRadius: widget.size / 4,
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

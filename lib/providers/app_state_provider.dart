@@ -4,6 +4,7 @@ import '../core/types.dart';
 import '../models/app_state.dart';
 import '../models/proxy_config.dart';
 import '../models/tun_config.dart';
+import '../services/mtproto_service.dart';
 import '../services/proxy_service.dart';
 import '../services/tun_service.dart';
 import '../utils/logger.dart';
@@ -12,15 +13,17 @@ import '../utils/logger.dart';
 class AppStateProvider extends ChangeNotifier {
   final ProxyService _proxyService;
   final TunService _tunService;
+  final MtprotoProxyService _mtprotoService;
 
   AppState _state = const AppState();
 
   AppStateProvider({
     required ProxyService proxyService,
     required TunService tunService,
+    MtprotoProxyService? mtprotoService,
   })  : _proxyService = proxyService,
-        _tunService = tunService;
-  // ignore: prefer_initializing_formals - поля private
+        _tunService = tunService,
+        _mtprotoService = mtprotoService ?? MtprotoProxyService();
 
   AppState get state => _state;
 
@@ -64,6 +67,9 @@ class AppStateProvider extends ChangeNotifier {
         case AppMode.tun:
           await _tunService.start(_state.tunConfig);
           break;
+        case AppMode.mtproto:
+          await _mtprotoService.start(_state.proxyConfig);
+          break;
       }
 
       _state = _state.copyWith(
@@ -99,6 +105,9 @@ class AppStateProvider extends ChangeNotifier {
           break;
         case AppMode.tun:
           await _tunService.stop();
+          break;
+        case AppMode.mtproto:
+          await _mtprotoService.stop();
           break;
       }
 

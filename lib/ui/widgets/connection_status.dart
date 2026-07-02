@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/types.dart';
 import '../theme/app_theme.dart';
 
-/// Виджет статуса подключения с красивым дизайном
+/// Виджет статуса подключения — Hiddify-стиль
 class ConnectionStatus extends StatelessWidget {
   final ServiceStatus status;
   final String? errorMessage;
@@ -20,11 +20,12 @@ class ConnectionStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GradientContainer(
+    return GlassCard(
       padding: const EdgeInsets.all(24),
+      hasGlow: status == ServiceStatus.running,
       child: Column(
         children: [
-          // Индикатор статуса
+          // Индикатор статуса с пульсацией
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -130,7 +131,7 @@ class _StatItem extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: AppTheme.cardBorderColor.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -151,14 +152,15 @@ class _StatItem extends StatelessWidget {
               fontSize: 18,
               fontWeight: FontWeight.bold,
               letterSpacing: 0.5,
+              color: AppTheme.textPrimary,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
-              color: Colors.white.withValues(alpha: 0.5),
+              color: AppTheme.textSecondary,
             ),
           ),
         ],

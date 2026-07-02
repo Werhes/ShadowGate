@@ -1,12 +1,9 @@
 import '../core/types.dart';
 import '../utils/logger.dart';
 
-/// Сервис DPI-обхода
+/// Сервис DPI-обхода (zapret-style)
+/// Реализует бесплатные методы обхода Deep Packet Inspection
 class DpiBypassService {
-  final bool _isRunning = false;
-
-  bool get isRunning => _isRunning;
-
   /// Применение методов DPI-обхода к пакету
   Future<List<int>> applyDpiMethods(
     List<int> packet,
@@ -37,46 +34,67 @@ class DpiBypassService {
         return _applyPacketReorder(packet);
       case DpiMethod.tlsObfuscation:
         return _applyTlsObfuscation(packet);
+      case DpiMethod.httpSplit:
+        return _applyHttpSplit(packet);
+      case DpiMethod.quicObfuscation:
+        return _applyQuicObfuscation(packet);
     }
   }
 
-  /// Фрагментация TCP-пакетов
+  /// Фрагментация TCP-пакетов (MSS clamping)
+  /// Разбиение на мелкие фрагменты для обхода DPI
   List<int> _applyFragmentation(List<int> packet) {
     // TODO: Реализовать фрагментацию TCP-пакетов
-    // Разбиение на мелкие фрагменты (MSS clamping)
+    // Разбиение на мелкие фрагменты (MSS clamping) как в zapret
     Logger.debug('Применение фрагментации TCP');
     return packet;
   }
 
   /// Изменение TTL
+  /// Установка TTL=1 для первого пакета handshake
   List<int> _applyTtlChange(List<int> packet) {
     // TODO: Реализовать изменение TTL
-    // Установка TTL=1 для первого пакета handshake
     Logger.debug('Применение изменения TTL');
     return packet;
   }
 
   /// Подмена Host header
+  /// Маскировка под легитимный трафик (как в zapret --hostspell)
   List<int> _applyHostSpoof(List<int> packet) {
     // TODO: Реализовать подмену Host header
-    // Маскировка под легитимный трафик
     Logger.debug('Применение подмены Host');
     return packet;
   }
 
   /// Перепаковка пакетов
+  /// Изменение порядка TCP-сегментов
   List<int> _applyPacketReorder(List<int> packet) {
     // TODO: Реализовать перепаковку пакетов
-    // Изменение порядка TCP-сегментов
     Logger.debug('Применение перепаковки пакетов');
     return packet;
   }
 
   /// TLS-обфускация
+  /// Добавление случайных данных в TLS ClientHello
   List<int> _applyTlsObfuscation(List<int> packet) {
     // TODO: Реализовать TLS-обфускацию
-    // Добавление случайных данных в TLS ClientHello
     Logger.debug('Применение TLS-обфускации');
+    return packet;
+  }
+
+  /// HTTP Split (как в zapret)
+  /// Разделение HTTP-запроса на части для обхода DPI
+  List<int> _applyHttpSplit(List<int> packet) {
+    // TODO: Реализовать HTTP Split
+    Logger.debug('Применение HTTP Split');
+    return packet;
+  }
+
+  /// QUIC-обфускация
+  /// Обфускация QUIC (HTTP/3) пакетов
+  List<int> _applyQuicObfuscation(List<int> packet) {
+    // TODO: Реализовать QUIC-обфускацию
+    Logger.debug('Применение QUIC-обфускации');
     return packet;
   }
 }

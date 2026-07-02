@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Основные типы приложения
+/// Основные режимы приложения
 enum AppMode {
   proxy,
-  tun;
+  tun,
+  mtproto;
 
   String get label {
     switch (this) {
@@ -11,6 +12,8 @@ enum AppMode {
         return 'Прокси';
       case AppMode.tun:
         return 'TUN';
+      case AppMode.mtproto:
+        return 'MTProto';
     }
   }
 
@@ -20,6 +23,8 @@ enum AppMode {
         return Icons.vpn_lock;
       case AppMode.tun:
         return Icons.settings_ethernet;
+      case AppMode.mtproto:
+        return Icons.telegram;
     }
   }
 
@@ -29,6 +34,8 @@ enum AppMode {
         return 'Локальный HTTP/SOCKS5 прокси-сервер';
       case AppMode.tun:
         return 'Виртуальный TUN-интерфейс с DPI-обходом';
+      case AppMode.mtproto:
+        return 'Telegram MTProto прокси (бесплатный обход блокировок)';
     }
   }
 }
@@ -36,7 +43,8 @@ enum AppMode {
 /// Типы прокси
 enum ProxyType {
   http,
-  socks5;
+  socks5,
+  mtproto;
 
   String get label {
     switch (this) {
@@ -44,6 +52,19 @@ enum ProxyType {
         return 'HTTP';
       case ProxyType.socks5:
         return 'SOCKS5';
+      case ProxyType.mtproto:
+        return 'MTProto';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case ProxyType.http:
+        return Icons.http;
+      case ProxyType.socks5:
+        return Icons.vpn_lock;
+      case ProxyType.mtproto:
+        return Icons.telegram;
     }
   }
 }
@@ -82,13 +103,15 @@ enum TargetService {
   }
 }
 
-/// Методы DPI-обхода
+/// Методы DPI-обхода (zapret-style)
 enum DpiMethod {
   fragmentation,
   ttl,
   hostSpoof,
   packetReorder,
-  tlsObfuscation;
+  tlsObfuscation,
+  httpSplit,
+  quicObfuscation;
 
   String get label {
     switch (this) {
@@ -102,13 +125,17 @@ enum DpiMethod {
         return 'Перепаковка пакетов';
       case DpiMethod.tlsObfuscation:
         return 'TLS-обфускация';
+      case DpiMethod.httpSplit:
+        return 'HTTP Split';
+      case DpiMethod.quicObfuscation:
+        return 'QUIC-обфускация';
     }
   }
 
   String get description {
     switch (this) {
       case DpiMethod.fragmentation:
-        return 'Разбиение TCP-пакетов на мелкие фрагменты';
+        return 'Разбиение TCP-пакетов на мелкие фрагменты (MSS clamping)';
       case DpiMethod.ttl:
         return 'Установка TTL=1 для первого пакета handshake';
       case DpiMethod.hostSpoof:
@@ -117,6 +144,10 @@ enum DpiMethod {
         return 'Изменение порядка TCP-сегментов';
       case DpiMethod.tlsObfuscation:
         return 'Добавление случайных данных в TLS ClientHello';
+      case DpiMethod.httpSplit:
+        return 'Разделение HTTP-запроса на части (как в zapret)';
+      case DpiMethod.quicObfuscation:
+        return 'Обфускация QUIC (HTTP/3) пакетов';
     }
   }
 }
@@ -151,11 +182,11 @@ enum ServiceStatus {
       case ServiceStatus.starting:
         return Colors.orange;
       case ServiceStatus.running:
-        return Colors.green;
+        return const Color(0xFF00E676);
       case ServiceStatus.stopping:
         return Colors.orange;
       case ServiceStatus.error:
-        return Colors.red;
+        return const Color(0xFFFF5252);
     }
   }
 }

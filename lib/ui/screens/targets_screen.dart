@@ -4,7 +4,7 @@ import '../../core/types.dart';
 import '../../models/target_config.dart';
 import '../theme/app_theme.dart';
 
-/// Экран управления целями
+/// Экран управления целями — Hiddify-стиль
 class TargetsScreen extends StatefulWidget {
   const TargetsScreen({super.key});
 
@@ -13,8 +13,7 @@ class TargetsScreen extends StatefulWidget {
 }
 
 class _TargetsScreenState extends State<TargetsScreen> {
-  // ignore: prefer_final_fields - список изменяется
-  List<TargetConfig> _targets = TargetConfig.defaults;
+  final List<TargetConfig> _targets = TargetConfig.defaults;
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +25,11 @@ class _TargetsScreenState extends State<TargetsScreen> {
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppTheme.cardBorderColor.withValues(alpha: 0.5),
+              ),
             ),
             child: IconButton(
               icon: const Icon(Icons.add),
@@ -79,11 +81,14 @@ class _TargetsScreenState extends State<TargetsScreen> {
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppTheme.cardBorderColor.withValues(alpha: 0.3),
+              ),
             ),
             child: Icon(
               Icons.track_changes,
               size: 40,
-              color: Colors.white.withValues(alpha: 0.2),
+              color: AppTheme.textMuted,
             ),
           ),
           const SizedBox(height: 20),
@@ -92,7 +97,7 @@ class _TargetsScreenState extends State<TargetsScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.white.withValues(alpha: 0.6),
+              color: AppTheme.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
@@ -100,7 +105,7 @@ class _TargetsScreenState extends State<TargetsScreen> {
             'Добавьте целевые сервисы для обхода блокировок',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.white.withValues(alpha: 0.4),
+              color: AppTheme.textMuted,
             ),
           ),
           const SizedBox(height: 24),
@@ -140,10 +145,18 @@ class _TargetsScreenState extends State<TargetsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: AppTheme.cardBorderColor.withValues(alpha: 0.5),
+          ),
+        ),
         title: Text(
           existing != null ? 'Редактировать цель' : 'Новая цель',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
+          ),
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -151,7 +164,7 @@ class _TargetsScreenState extends State<TargetsScreen> {
             children: [
               TextField(
                 controller: nameController,
-                style: const TextStyle(color: Colors.white),
+                style: const TextStyle(color: AppTheme.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Название',
                   hintText: 'Мой сервис',
@@ -166,7 +179,7 @@ class _TargetsScreenState extends State<TargetsScreen> {
               const SizedBox(height: 12),
               TextField(
                 controller: domainsController,
-                style: const TextStyle(color: Colors.white),
+                style: const TextStyle(color: AppTheme.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Домены (через запятую)',
                   hintText: 'example.com, api.example.com',
@@ -181,7 +194,7 @@ class _TargetsScreenState extends State<TargetsScreen> {
               const SizedBox(height: 12),
               TextField(
                 controller: ipRangesController,
-                style: const TextStyle(color: Colors.white),
+                style: const TextStyle(color: AppTheme.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'IP-диапазоны (через запятую)',
                   hintText: '192.168.1.0/24, 10.0.0.0/8',
@@ -196,7 +209,7 @@ class _TargetsScreenState extends State<TargetsScreen> {
               const SizedBox(height: 12),
               TextField(
                 controller: portsController,
-                style: const TextStyle(color: Colors.white),
+                style: const TextStyle(color: AppTheme.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Порты (через запятую)',
                   hintText: '443, 80',
@@ -217,7 +230,7 @@ class _TargetsScreenState extends State<TargetsScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Отмена',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+              style: TextStyle(color: AppTheme.textSecondary),
             ),
           ),
           GradientButton(
@@ -283,7 +296,7 @@ class _TargetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: GradientContainer(
+      child: GlassCard(
         borderRadius: 16,
         padding: const EdgeInsets.all(4),
         child: ListTile(
@@ -303,7 +316,7 @@ class _TargetCard extends StatelessWidget {
             ),
             child: Icon(
               target.service.icon,
-              color: target.enabled ? Colors.white : Colors.white.withValues(alpha: 0.4),
+              color: target.enabled ? Colors.white : AppTheme.textMuted,
               size: 22,
             ),
           ),
@@ -311,14 +324,16 @@ class _TargetCard extends StatelessWidget {
             target.name,
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: target.enabled ? Colors.white : Colors.white.withValues(alpha: 0.5),
+              color: target.enabled
+                  ? AppTheme.textPrimary
+                  : AppTheme.textSecondary,
             ),
           ),
           subtitle: Text(
             '${target.domains.length} доменов, ${target.ipRanges.length} IP-диапазонов',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
-              color: Colors.white.withValues(alpha: 0.4),
+              color: AppTheme.textMuted,
             ),
           ),
           trailing: Row(
@@ -328,7 +343,7 @@ class _TargetCard extends StatelessWidget {
                 icon: Icon(
                   Icons.edit,
                   size: 18,
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: AppTheme.textSecondary,
                 ),
                 onPressed: onEdit,
                 tooltip: 'Редактировать',

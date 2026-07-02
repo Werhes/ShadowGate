@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../utils/logger.dart';
 import '../theme/app_theme.dart';
 
-/// Виджет просмотра логов с красивым дизайном
+/// Виджет просмотра логов — Hiddify-стиль
 class LogViewer extends StatefulWidget {
   final List<LogEntry> logs;
   final VoidCallback onClear;
@@ -59,6 +59,9 @@ class _LogViewerState extends State<LogViewer> {
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppTheme.cardBorderColor.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: IconButton(
                     icon: Icon(
@@ -66,7 +69,9 @@ class _LogViewerState extends State<LogViewer> {
                           ? Icons.vertical_align_bottom
                           : Icons.vertical_align_center,
                       size: 20,
-                      color: _autoScroll ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.5),
+                      color: _autoScroll
+                          ? AppTheme.primaryColor
+                          : AppTheme.textMuted,
                     ),
                     onPressed: () {
                       setState(() => _autoScroll = !_autoScroll);
@@ -79,12 +84,15 @@ class _LogViewerState extends State<LogViewer> {
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppTheme.cardBorderColor.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: IconButton(
                     icon: Icon(
                       Icons.delete_outline,
                       size: 20,
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: AppTheme.textMuted,
                     ),
                     onPressed: widget.onClear,
                     tooltip: 'Очистить',
@@ -96,7 +104,7 @@ class _LogViewerState extends State<LogViewer> {
         ),
         const SizedBox(height: 12),
         Expanded(
-          child: GradientContainer(
+          child: GlassCard(
             borderRadius: 16,
             padding: const EdgeInsets.all(4),
             child: widget.logs.isEmpty
@@ -107,13 +115,13 @@ class _LogViewerState extends State<LogViewer> {
                         Icon(
                           Icons.terminal,
                           size: 48,
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: AppTheme.textMuted,
                         ),
                         const SizedBox(height: 12),
                         Text(
                           'Логов нет',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.4),
+                            color: AppTheme.textMuted,
                             fontSize: 16,
                           ),
                         ),
@@ -176,7 +184,7 @@ class _LogEntryWidget extends StatelessWidget {
   Color _getColor() {
     switch (entry.level) {
       case LogLevel.debug:
-        return Colors.grey;
+        return AppTheme.textMuted;
       case LogLevel.info:
         return AppTheme.primaryColor;
       case LogLevel.warn:

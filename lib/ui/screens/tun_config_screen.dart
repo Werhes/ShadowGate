@@ -5,7 +5,7 @@ import '../../core/types.dart';
 import '../../providers/app_state_provider.dart';
 import '../theme/app_theme.dart';
 
-/// Экран настроек TUN
+/// Экран настроек TUN — Hiddify-стиль
 class TunConfigScreen extends StatefulWidget {
   const TunConfigScreen({super.key});
 
@@ -57,7 +57,10 @@ class _TunConfigScreenState extends State<TunConfigScreen> {
               onPressed: _save,
               child: const Text(
                 'Сохранить',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -74,7 +77,7 @@ class _TunConfigScreenState extends State<TunConfigScreen> {
               // Интерфейс
               const SectionHeader(title: 'Интерфейс'),
               const SizedBox(height: 12),
-              GradientContainer(
+              GlassCard(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
@@ -111,11 +114,13 @@ class _TunConfigScreenState extends State<TunConfigScreen> {
               const SizedBox(height: 24),
 
               // Обход локального трафика
-              GradientContainer(
+              GlassCard(
                 padding: const EdgeInsets.all(8),
                 child: SwitchListTile(
                   title: const Text('Обходить локальный трафик'),
-                  subtitle: const Text('Не маршрутизировать локальный трафик через TUN'),
+                  subtitle: const Text(
+                    'Не маршрутизировать локальный трафик через TUN',
+                  ),
                   value: _bypassLocal,
                   onChanged: (value) {
                     setState(() => _bypassLocal = value);
@@ -124,10 +129,10 @@ class _TunConfigScreenState extends State<TunConfigScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Методы DPI-обхода
+              // Методы DPI-обхода (zapret-style)
               const SectionHeader(title: 'Методы DPI-обхода'),
               const SizedBox(height: 12),
-              GradientContainer(
+              GlassCard(
                 padding: const EdgeInsets.all(8),
                 child: Column(
                   children: DpiMethod.values.map((method) {
@@ -136,14 +141,18 @@ class _TunConfigScreenState extends State<TunConfigScreen> {
                       title: Text(
                         method.label,
                         style: TextStyle(
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
+                          color: isSelected
+                              ? AppTheme.textPrimary
+                              : AppTheme.textSecondary,
                         ),
                       ),
                       subtitle: Text(
                         method.description,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: Colors.white.withValues(alpha: 0.5),
+                          color: AppTheme.textMuted,
                         ),
                       ),
                       value: isSelected,
@@ -175,9 +184,8 @@ class _TunConfigScreenState extends State<TunConfigScreen> {
       provider.state.tunConfig.copyWith(
         interfaceName: _interfaceController.text,
         mtu: int.tryParse(_mtuController.text) ?? 1500,
-        dnsServer: _dnsController.text.isNotEmpty
-            ? _dnsController.text
-            : null,
+        dnsServer:
+            _dnsController.text.isNotEmpty ? _dnsController.text : null,
         bypassLocalTraffic: _bypassLocal,
         enabledMethods: _selectedMethods.toList(),
       ),
@@ -188,8 +196,6 @@ class _TunConfigScreenState extends State<TunConfigScreen> {
       SnackBar(
         content: const Text('Настройки сохранены'),
         backgroundColor: AppTheme.successColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }

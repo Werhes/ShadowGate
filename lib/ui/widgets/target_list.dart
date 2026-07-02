@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/target_config.dart';
 import '../theme/app_theme.dart';
 
-/// Виджет списка целей с красивым дизайном
+/// Виджет списка целей — Hiddify-стиль
 class TargetList extends StatelessWidget {
   final List<TargetConfig> targets;
   final ValueChanged<String> onToggle;
@@ -29,11 +29,14 @@ class TargetList extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppTheme.cardBorderColor.withValues(alpha: 0.3),
+                ),
               ),
               child: Icon(
                 Icons.track_changes,
                 size: 40,
-                color: Colors.white.withValues(alpha: 0.2),
+                color: AppTheme.textMuted,
               ),
             ),
             const SizedBox(height: 20),
@@ -42,7 +45,7 @@ class TargetList extends StatelessWidget {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Colors.white.withValues(alpha: 0.6),
+                color: AppTheme.textSecondary,
               ),
             ),
             const SizedBox(height: 8),
@@ -51,7 +54,7 @@ class TargetList extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.white.withValues(alpha: 0.4),
+                color: AppTheme.textMuted,
               ),
             ),
             const SizedBox(height: 24),
@@ -92,7 +95,7 @@ class _TargetItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: GradientContainer(
+      child: GlassCard(
         borderRadius: 16,
         padding: const EdgeInsets.all(4),
         child: ListTile(
@@ -112,7 +115,7 @@ class _TargetItem extends StatelessWidget {
             ),
             child: Icon(
               target.service.icon,
-              color: target.enabled ? Colors.white : Colors.white.withValues(alpha: 0.4),
+              color: target.enabled ? Colors.white : AppTheme.textMuted,
               size: 22,
             ),
           ),
@@ -120,14 +123,16 @@ class _TargetItem extends StatelessWidget {
             target.name,
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: target.enabled ? Colors.white : Colors.white.withValues(alpha: 0.5),
+              color: target.enabled
+                  ? AppTheme.textPrimary
+                  : AppTheme.textSecondary,
             ),
           ),
           subtitle: Text(
             '${target.domains.length} доменов, ${target.ipRanges.length} IP-диапазонов',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
-              color: Colors.white.withValues(alpha: 0.4),
+              color: AppTheme.textMuted,
             ),
           ),
           trailing: Switch(

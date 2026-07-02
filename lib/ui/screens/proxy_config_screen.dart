@@ -6,7 +6,7 @@ import '../../providers/app_state_provider.dart';
 import '../../utils/validators.dart';
 import '../theme/app_theme.dart';
 
-/// Экран настроек прокси
+/// Экран настроек прокси и MTProto — Hiddify-стиль
 class ProxyConfigScreen extends StatefulWidget {
   const ProxyConfigScreen({super.key});
 
@@ -43,10 +43,12 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMtproto = _proxyType == ProxyType.mtproto;
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Настройки прокси'),
+        title: Text(isMtproto ? 'Настройки MTProto' : 'Настройки прокси'),
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 8),
@@ -58,7 +60,10 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
               onPressed: _save,
               child: const Text(
                 'Сохранить',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -73,10 +78,11 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
               padding: const EdgeInsets.all(20),
               children: [
                 const SizedBox(height: 10),
+
                 // Тип прокси
                 const SectionHeader(title: 'Тип прокси'),
                 const SizedBox(height: 12),
-                GradientContainer(
+                GlassCard(
                   padding: const EdgeInsets.all(16),
                   child: SegmentedButton<ProxyType>(
                     segments: ProxyType.values.map((type) {
@@ -86,6 +92,7 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
                           type.label,
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
+                        icon: Icon(type.icon, size: 18),
                       );
                     }).toList(),
                     selected: {_proxyType},
@@ -103,7 +110,7 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
                         if (states.contains(WidgetState.selected)) {
                           return Colors.white;
                         }
-                        return Colors.white.withValues(alpha: 0.6);
+                        return AppTheme.textSecondary;
                       }),
                     ),
                   ),
@@ -113,7 +120,7 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
                 // Адрес и порт
                 const SectionHeader(title: 'Соединение'),
                 const SizedBox(height: 12),
-                GradientContainer(
+                GlassCard(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
@@ -129,10 +136,10 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _portController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Порт',
-                          hintText: '1080',
-                          prefixIcon: Icon(Icons.numbers),
+                          hintText: isMtproto ? '443' : '1080',
+                          prefixIcon: const Icon(Icons.numbers),
                         ),
                         keyboardType: TextInputType.number,
                         validator: Validators.validatePort,
@@ -142,16 +149,20 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // WebSocket
+                // WebSocket (для MTProto и прокси)
                 const SectionHeader(title: 'WebSocket'),
                 const SizedBox(height: 12),
-                GradientContainer(
+                GlassCard(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
                       SwitchListTile(
                         title: const Text('Использовать WebSocket'),
-                        subtitle: const Text('Перенаправлять трафик через WebSocket'),
+                        subtitle: Text(
+                          isMtproto
+                              ? 'Подключение к Telegram через WebSocket'
+                              : 'Перенаправлять трафик через WebSocket',
+                        ),
                         value: _useWebSocket,
                         onChanged: (value) {
                           setState(() => _useWebSocket = value);
@@ -162,17 +173,60 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _wsUrlController,
-                          decoration: const InputDecoration(
-                            labelText: 'WebSocket URL',
-                            hintText: 'wss://example.com/ws',
-                            prefixIcon: Icon(Icons.link),
+                          decoration: InputDecoration(
+                            labelText: isMtproto
+                                ? 'Telegram WebSocket URL'
+                                : 'WebSocket URL',
+                            hintText: isMtproto
+                                ? 'wss://pluto.web.telegram.org/apiws'
+                                : 'wss://example.com/ws',
+                            prefixIcon: const Icon(Icons.link),
                           ),
-                          validator: _useWebSocket ? Validators.validateUrl : null,
+                          validator:
+                              _useWebSocket ? Validators.validateUrl : null,
                         ),
                       ],
                     ],
                   ),
                 ),
+
+                if (isMtproto) ...[
+                  const SizedBox(height: 24),
+                  GlassCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline,
+                                color: AppTheme.primaryColor, size: 20),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'MTProto Proxy',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Бесплатный MTProto прокси для Telegram. '
+                          'После запуска откройте ссылку tg://proxy?server=... '
+                          'в браузере или настройте прокси в Telegram вручную.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.textSecondary,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -200,8 +254,6 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
       SnackBar(
         content: const Text('Настройки сохранены'),
         backgroundColor: AppTheme.successColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }

@@ -13,7 +13,7 @@ import 'proxy_config_screen.dart';
 import 'targets_screen.dart';
 import 'tun_config_screen.dart';
 
-/// Главный экран приложения
+/// Главный экран приложения — Hiddify-стиль
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -49,8 +49,11 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppTheme.cardBorderColor.withValues(alpha: 0.5),
+              ),
             ),
             child: IconButton(
               icon: const Icon(Icons.settings, size: 22),
@@ -73,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
           color: AppTheme.surfaceColor,
           border: Border(
             top: BorderSide(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: AppTheme.cardBorderColor.withValues(alpha: 0.3),
             ),
           ),
         ),
@@ -127,7 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               const SizedBox(height: 10),
 
-              // Выбор режима
+              // Выбор режима — Proxy / TUN / MTProto
               const SectionHeader(title: 'Режим работы'),
               ModeSelector(
                 currentMode: state.mode,
@@ -165,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Конфигурация
+              // Текущая конфигурация
               const SectionHeader(title: 'Текущая конфигурация'),
               _buildConfigSummary(context, provider),
             ],
@@ -181,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ) {
     final state = provider.state;
 
-    return GradientContainer(
+    return GlassCard(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
@@ -202,6 +205,24 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icons.web,
               label: 'WebSocket',
               value: state.proxyConfig.useWebSocket ? 'Включён' : 'Выключен',
+            ),
+          ] else if (state.mode == AppMode.mtproto) ...[
+            _ConfigRow(
+              icon: Icons.telegram,
+              label: 'Тип',
+              value: 'MTProto Proxy',
+            ),
+            const SizedBox(height: 12),
+            _ConfigRow(
+              icon: Icons.computer,
+              label: 'Адрес',
+              value: '${state.proxyConfig.host}:${state.proxyConfig.port}',
+            ),
+            const SizedBox(height: 12),
+            _ConfigRow(
+              icon: Icons.link,
+              label: 'WebSocket URL',
+              value: state.proxyConfig.webSocketUrl ?? 'wss://pluto.web.telegram.org/apiws',
             ),
           ] else ...[
             _ConfigRow(
@@ -307,9 +328,16 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => mode == AppMode.proxy
-            ? const ProxyConfigScreen()
-            : const TunConfigScreen(),
+        builder: (_) {
+          switch (mode) {
+            case AppMode.proxy:
+              return const ProxyConfigScreen();
+            case AppMode.tun:
+              return const TunConfigScreen();
+            case AppMode.mtproto:
+              return const ProxyConfigScreen();
+          }
+        },
       ),
     );
   }
@@ -334,10 +362,10 @@ class _ConfigRow extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withValues(alpha: 0.15),
+            gradient: AppTheme.primaryGradient,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: AppTheme.primaryColor, size: 18),
+          child: Icon(icon, color: Colors.white, size: 18),
         ),
         const SizedBox(width: 12),
         Column(
@@ -345,9 +373,9 @@ class _ConfigRow extends StatelessWidget {
           children: [
             Text(
               label,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 12,
-                color: Colors.white.withValues(alpha: 0.5),
+                color: AppTheme.textSecondary,
               ),
             ),
             const SizedBox(height: 2),
@@ -356,6 +384,7 @@ class _ConfigRow extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
+                color: AppTheme.textPrimary,
               ),
             ),
           ],

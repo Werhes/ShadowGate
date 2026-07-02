@@ -31,10 +31,10 @@ class Socks5Handler {
   static const _repAddressNotSupported = 0x08;
 
   final Socket _client;
-  final String? _username;
-  final String? _password;
+  final String? username;
+  final String? password;
 
-  Socks5Handler(this._client, {this._username, this._password});
+  Socks5Handler(this._client, {this.username, this.password});
 
   /// Обработка SOCKS5-соединения
   Future<void> handle() async {
@@ -66,7 +66,7 @@ class Socks5Handler {
     final methods = await _readBytes(nmethods);
 
     // Выбираем метод аутентификации
-    if (_username != null && _password != null) {
+    if (username != null && password != null) {
       if (methods.contains(_authPassword)) {
         _sendGreetingResponse(_authPassword);
         return _authenticate();
@@ -91,7 +91,7 @@ class Socks5Handler {
     final plen = (await _readBytes(1))[0];
     final passwd = String.fromCharCodes(await _readBytes(plen));
 
-    if (uname == _username && passwd == _password) {
+    if (uname == username && passwd == password) {
       _client.add([0x01, 0x00]); // Успех
       await _client.flush();
       return true;
