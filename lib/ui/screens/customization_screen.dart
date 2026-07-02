@@ -229,14 +229,6 @@ class _ThemeCard extends StatelessWidget {
                       color: AppTheme.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Цвет: #${theme.previewColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
                 ],
               ),
             ),
