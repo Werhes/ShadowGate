@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import '../models/proxy_config.dart';
 import '../utils/logger.dart';
@@ -8,16 +9,34 @@ import '../utils/logger.dart';
 /// MTProto прокси-сервер (как в tg-ws-proxy от flowseal)
 /// Реализует Telegram MTProto протокол через WebSocket
 /// Позволяет бесплатно обходить блокировки Telegram
+///
+/// MTProto secret — это 32 hex-символа (16 байт),
+/// которые Telegram использует для шифрования соединения.
+/// Без secret Telegram не может подключиться к прокси.
 class MtprotoProxyService {
   HttpServer? _server;
   bool _isRunning = false;
   Timer? _statsTimer;
   int _bytesSent = 0;
   int _bytesReceived = 0;
+  String? _generatedSecret;
+  final _random = Random.secure();
+
+  /// Колбэк для обновления статистики трафика
+  void Function(int sent, int received)? onTrafficUpdate;
 
   bool get isRunning => _isRunning;
   int get bytesSent => _bytesSent;
   int get bytesReceived => _bytesReceived;
+
+  /// Сгенерированный секрет для MTProto
+  String? get secret => _generatedSecret;
+
+  /// Генерация случайного MTProto secret (32 hex-символа = 16 байт)
+  String _generateSecret() {
+    final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
 
   /// Запуск MTProto прокси-сервера
   Future<void> start(ProxyConfig config) async {
@@ -27,9 +46,12 @@ class MtprotoProxyService {
     }
 
     try {
+      // Генерируем секрет, если его нет
+      _generatedSecret = config.mtprotoSecret ?? _generateSecret();
       Logger.info(
         'Запуск MTProto прокси на ${config.host}:${config.port}',
       );
+      Logger.info('MTProto secret: $_generatedSecret');
 
       _server = await HttpServer.bind(
         InternetAddress.anyIPv4,
@@ -50,9 +72,9 @@ class MtprotoProxyService {
       _isRunning = true;
       Logger.info('MTProto прокси запущен на порту ${config.port}');
 
-      // Таймер для сброса статистики
+      // Таймер для обновления статистики
       _statsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        // Сброс для пересчёта скорости
+        onTrafficUpdate?.call(_bytesSent, _bytesReceived);
       });
     } catch (e) {
       Logger.error('Ошибка запуска MTProto прокси: $e');
@@ -69,6 +91,8 @@ class MtprotoProxyService {
       await _server?.close(force: true);
       _server = null;
       _isRunning = false;
+      _bytesSent = 0;
+      _bytesReceived = 0;
       Logger.info('MTProto прокси остановлен');
     } catch (e) {
       Logger.error('Ошибка остановки MTProto прокси: $e');
@@ -125,11 +149,13 @@ class MtprotoProxyService {
       // Двунаправленная передача данных
       await Future.wait([
         ws.forEach((data) {
-          _bytesSent += (data is List<int> ? data.length : data.toString().length);
+          final len = data is List<int> ? data.length : data.toString().length;
+          _bytesSent += len;
           tgWs.add(data);
         }).catchError((_) {}),
         tgWs.forEach((data) {
-          _bytesReceived += (data is List<int> ? data.length : data.toString().length);
+          final len = data is List<int> ? data.length : data.toString().length;
+          _bytesReceived += len;
           ws.add(data);
         }).catchError((_) {}),
       ]);
@@ -239,11 +265,15 @@ class MtprotoProxyService {
     }
   }
 
-  /// Отправка статусной страницы
+  /// Отправка статусной страницы с секретом
   Future<void> _sendStatusPage(
     HttpRequest request,
     ProxyConfig config,
   ) async {
+    final secret = _generatedSecret ?? 'не сгенерирован';
+    final tgProxyLink =
+        'tg://proxy?server=${config.host}&port=${config.port}&secret=$secret';
+
     request.response.statusCode = HttpStatus.ok;
     request.response.headers.set('content-type', 'text/html; charset=utf-8');
     request.response.write('''
@@ -268,7 +298,7 @@ class MtprotoProxyService {
       background: linear-gradient(135deg, #1a1a2e, #16213e);
       border-radius: 20px;
       padding: 40px;
-      max-width: 400px;
+      max-width: 420px;
       width: 100%;
       text-align: center;
       border: 1px solid rgba(255,255,255,0.1);
@@ -294,6 +324,24 @@ class MtprotoProxyService {
       margin: 20px 0;
       font-weight: bold;
     }
+    .secret-box {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #00E676;
+      word-break: break-all;
+      margin: 12px 0;
+    }
+    .label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 16px;
+    }
   </style>
 </head>
 <body>
@@ -301,11 +349,14 @@ class MtprotoProxyService {
     <div><span class="status"></span> MTProto Proxy</div>
     <h1>ShadowGate</h1>
     <p class="info">MTProto прокси-сервер запущен</p>
-    <a class="proxy-link" href="tg://proxy?server=${config.host}&port=${config.port}">
+    <div class="label">Secret (скопируйте для подключения)</div>
+    <div class="secret-box">$secret</div>
+    <a class="proxy-link" href="$tgProxyLink">
       Подключиться в Telegram
     </a>
     <p class="info">
       Сервер: ${config.host}:${config.port}<br>
+      Secret: $secret<br>
       Статус: Активен
     </p>
   </div>

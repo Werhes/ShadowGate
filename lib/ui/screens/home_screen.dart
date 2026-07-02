@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/types.dart';
 import '../../providers/app_state_provider.dart';
@@ -9,6 +10,7 @@ import '../widgets/connection_status.dart';
 import '../widgets/mode_selector.dart';
 import '../widgets/log_viewer.dart';
 import '../widgets/target_list.dart';
+import 'customization_screen.dart';
 import 'proxy_config_screen.dart';
 import 'targets_screen.dart';
 import 'tun_config_screen.dart';
@@ -64,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: AppTheme.surfaceGradient,
         ),
         child: SafeArea(
@@ -166,6 +168,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? AppTheme.accentGradient
                     : null,
               ),
+
+              // Кнопка "Подключиться в Telegram" для MTProto режима
+              if (state.status == ServiceStatus.running &&
+                  state.mode == AppMode.mtproto) ...[
+                const SizedBox(height: 16),
+                GradientButton(
+                  label: 'Подключиться в Telegram',
+                  icon: Icons.telegram,
+                  onPressed: () {
+                    _connectToTelegram(context, provider);
+                  },
+                  gradient: AppTheme.primaryGradient,
+                ),
+              ],
+
               const SizedBox(height: 24),
 
               // Текущая конфигурация
@@ -223,6 +240,12 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icons.link,
               label: 'WebSocket URL',
               value: state.proxyConfig.webSocketUrl ?? 'wss://pluto.web.telegram.org/apiws',
+            ),
+            const SizedBox(height: 12),
+            _ConfigRow(
+              icon: Icons.key,
+              label: 'Secret',
+              value: state.proxyConfig.mtprotoSecret ?? 'будет сгенерирован при запуске',
             ),
           ] else ...[
             _ConfigRow(
@@ -321,23 +344,168 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _connectToTelegram(BuildContext context, AppStateProvider provider) {
+    final config = provider.state.proxyConfig;
+    final secret = config.mtprotoSecret;
+    if (secret == null) return;
+
+    final uri = Uri.parse(
+      'tg://proxy?server=${config.host}&port=${config.port}&secret=$secret',
+    );
+
+    // Сохраняем SnackBar host до асинхронного вызова
+    final messenger = ScaffoldMessenger.of(context);
+    final host = config.host;
+    final port = config.port;
+
+    launchUrl(uri, mode: LaunchMode.externalApplication).then((success) {
+      if (!success) {
+        // Если tg:// не открылся, показываем ссылку для копирования
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Не удалось открыть Telegram. '
+              'Скопируйте настройки вручную:\n'
+              'Сервер: $host:$port\n'
+              'Secret: $secret',
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    });
+  }
+
   void _openSettings(BuildContext context) {
     final provider = context.read<AppStateProvider>();
     final mode = provider.state.mode;
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) {
-          switch (mode) {
-            case AppMode.proxy:
-              return const ProxyConfigScreen();
-            case AppMode.tun:
-              return const TunConfigScreen();
-            case AppMode.mtproto:
-              return const ProxyConfigScreen();
-          }
-        },
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(
+            top: BorderSide(
+              color: AppTheme.cardBorderColor.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Полоска захвата
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: AppTheme.textMuted.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Настройки режима
+              _SettingsItem(
+                icon: mode == AppMode.mtproto
+                    ? Icons.telegram
+                    : Icons.vpn_lock,
+                title: mode == AppMode.mtproto
+                    ? 'Настройки MTProto'
+                    : 'Настройки прокси',
+                subtitle: 'Порт, хост, WebSocket',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => mode == AppMode.tun
+                          ? const TunConfigScreen()
+                          : const ProxyConfigScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              // Кастомизация
+              _SettingsItem(
+                icon: Icons.palette,
+                title: 'Кастомизация',
+                subtitle: 'Тема оформления',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const CustomizationScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Элемент меню настроек
+class _SettingsItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _SettingsItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: AppTheme.cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: AppTheme.cardBorderColor.withValues(alpha: 0.5),
+        ),
+      ),
+      child: ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            gradient: AppTheme.primaryGradient,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppTheme.textSecondary,
+          ),
+        ),
+        trailing: const Icon(
+          Icons.chevron_right,
+          color: AppTheme.textMuted,
+        ),
+        onTap: onTap,
       ),
     );
   }

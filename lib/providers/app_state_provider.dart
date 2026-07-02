@@ -6,44 +6,124 @@ import '../models/proxy_config.dart';
 import '../models/tun_config.dart';
 import '../services/mtproto_service.dart';
 import '../services/proxy_service.dart';
+import '../services/settings_service.dart';
 import '../services/tun_service.dart';
+import '../ui/theme/app_theme.dart';
 import '../utils/logger.dart';
 
 /// Провайдер состояния приложения
+/// Автоматически сохраняет настройки при изменениях
 class AppStateProvider extends ChangeNotifier {
   final ProxyService _proxyService;
   final TunService _tunService;
   final MtprotoProxyService _mtprotoService;
+  final SettingsService _settingsService;
 
   AppState _state = const AppState();
+  bool _initialized = false;
+  AppThemeType _themeType = AppThemeType.violet;
 
   AppStateProvider({
     required ProxyService proxyService,
     required TunService tunService,
+    required SettingsService settingsService,
     MtprotoProxyService? mtprotoService,
   })  : _proxyService = proxyService,
         _tunService = tunService,
-        _mtprotoService = mtprotoService ?? MtprotoProxyService();
+        _mtprotoService = mtprotoService ?? MtprotoProxyService(),
+        _settingsService = settingsService {
+    // Подписываемся на обновления трафика от всех сервисов
+    _proxyService.onTrafficUpdate = _onProxyTrafficUpdate;
+    _tunService.onTrafficUpdate = _onTunTrafficUpdate;
+    _mtprotoService.onTrafficUpdate = _onMtprotoTrafficUpdate;
+  }
 
   AppState get state => _state;
+  bool get initialized => _initialized;
+  AppThemeType get themeType => _themeType;
 
-  /// Установка режима
+  /// Инициализация: загрузка сохранённых настроек
+  Future<void> initialize() async {
+    await _settingsService.init();
+
+    final savedMode = _settingsService.loadAppMode();
+    final savedProxyConfig = _settingsService.loadProxyConfig();
+    final savedTunConfig = _settingsService.loadTunConfig();
+
+    _state = _state.copyWith(
+      mode: savedMode,
+      proxyConfig: savedProxyConfig,
+      tunConfig: savedTunConfig,
+    );
+
+    // Загружаем сохранённую тему
+    _themeType = _settingsService.loadThemeType();
+
+    _initialized = true;
+    notifyListeners();
+
+    Logger.info(
+      'Настройки загружены: режим=${savedMode.name}, '
+      'прокси=${savedProxyConfig.host}:${savedProxyConfig.port}, '
+      'tun=${savedTunConfig.interfaceName}',
+    );
+  }
+
+  /// Обработка обновления трафика от прокси-сервиса
+  void _onProxyTrafficUpdate(int sent, int received) {
+    _state = _state.copyWith(
+      bytesSent: sent,
+      bytesReceived: received,
+    );
+    notifyListeners();
+  }
+
+  /// Обработка обновления трафика от TUN-сервиса
+  void _onTunTrafficUpdate(int sent, int received) {
+    _state = _state.copyWith(
+      bytesSent: sent,
+      bytesReceived: received,
+    );
+    notifyListeners();
+  }
+
+  /// Обработка обновления трафика от MTProto-сервиса
+  void _onMtprotoTrafficUpdate(int sent, int received) {
+    _state = _state.copyWith(
+      bytesSent: sent,
+      bytesReceived: received,
+    );
+    notifyListeners();
+  }
+
+  /// Установка режима с автосохранением
   void setMode(AppMode mode) {
     _state = _state.copyWith(mode: mode);
     notifyListeners();
+    _settingsService.saveAppMode(mode);
     Logger.info('Режим изменён на: ${mode.label}');
   }
 
-  /// Обновление конфигурации прокси
+  /// Обновление конфигурации прокси с автосохранением
   void updateProxyConfig(ProxyConfig config) {
     _state = _state.copyWith(proxyConfig: config);
     notifyListeners();
+    _settingsService.saveProxyConfig(config);
   }
 
-  /// Обновление конфигурации TUN
+  /// Обновление конфигурации TUN с автосохранением
   void updateTunConfig(TunConfig config) {
     _state = _state.copyWith(tunConfig: config);
     notifyListeners();
+    _settingsService.saveTunConfig(config);
+  }
+
+  /// Установка темы оформления с автосохранением
+  void setThemeType(AppThemeType type) {
+    _themeType = type;
+    notifyListeners();
+    _settingsService.saveThemeType(type);
+    Logger.info('Тема изменена на: ${type.label}');
   }
 
   /// Запуск сервиса
@@ -124,7 +204,7 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Обновление статистики трафика
+  /// Обновление статистики трафика (ручной вызов)
   void updateTraffic({int? sent, int? received}) {
     _state = _state.copyWith(
       bytesSent: sent,

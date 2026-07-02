@@ -5,15 +5,26 @@ import 'dart:io';
 import '../core/types.dart';
 import '../models/proxy_config.dart';
 import '../utils/logger.dart';
+import 'dpi_bypass_service.dart';
 import 'socks5_handler.dart';
 
 /// Сервис для управления прокси-сервером
+/// С поддержкой DPI-обхода (zapret-style)
 class ProxyService {
   HttpServer? _httpServer;
   ServerSocket? _socksServer;
   bool _isRunning = false;
+  final DpiBypassService _dpiBypass = DpiBypassService();
+  Timer? _statsTimer;
+  int _bytesSent = 0;
+  int _bytesReceived = 0;
+
+  /// Колбэк для обновления статистики трафика
+  void Function(int sent, int received)? onTrafficUpdate;
 
   bool get isRunning => _isRunning;
+  int get bytesSent => _bytesSent;
+  int get bytesReceived => _bytesReceived;
 
   /// Запуск прокси-сервера
   Future<void> start(ProxyConfig config) async {
@@ -35,6 +46,11 @@ class ProxyService {
 
       _isRunning = true;
       Logger.info('Прокси-сервер запущен на порту ${config.port}');
+
+      // Таймер для обновления статистики
+      _statsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        onTrafficUpdate?.call(_bytesSent, _bytesReceived);
+      });
     } catch (e) {
       Logger.error('Ошибка запуска прокси: $e');
       rethrow;
@@ -50,7 +66,7 @@ class ProxyService {
 
     _httpServer!.listen(
       (HttpRequest request) {
-        _handleHttpRequest(request).catchError((error) {
+        _handleHttpRequest(request, config).catchError((error) {
           Logger.error('Ошибка обработки HTTP запроса: $error');
         });
       },
@@ -73,6 +89,11 @@ class ProxyService {
           client,
           username: config.username,
           password: config.password,
+          dpiBypass: _dpiBypass,
+          onTrafficUpdate: (sent, received) {
+            _bytesSent += sent;
+            _bytesReceived += received;
+          },
         );
         handler.handle().catchError((error) {
           Logger.error('Ошибка SOCKS5 обработки: $error');
@@ -89,11 +110,14 @@ class ProxyService {
     if (!_isRunning) return;
 
     try {
+      _statsTimer?.cancel();
       await _httpServer?.close(force: true);
       _httpServer = null;
       await _socksServer?.close();
       _socksServer = null;
       _isRunning = false;
+      _bytesSent = 0;
+      _bytesReceived = 0;
       Logger.info('Прокси-сервер остановлен');
     } catch (e) {
       Logger.error('Ошибка остановки прокси: $e');
@@ -102,18 +126,24 @@ class ProxyService {
   }
 
   /// Обработка HTTP-запроса
-  Future<void> _handleHttpRequest(HttpRequest request) async {
+  Future<void> _handleHttpRequest(
+    HttpRequest request,
+    ProxyConfig config,
+  ) async {
     final method = request.method.toUpperCase();
 
     if (method == 'CONNECT') {
-      await _handleConnect(request);
+      await _handleConnect(request, config);
     } else {
-      await _handleHttpProxy(request);
+      await _handleHttpProxy(request, config);
     }
   }
 
-  /// Обработка CONNECT (HTTPS туннелирование)
-  Future<void> _handleConnect(HttpRequest request) async {
+  /// Обработка CONNECT (HTTPS туннелирование) с DPI-обходом
+  Future<void> _handleConnect(
+    HttpRequest request,
+    ProxyConfig config,
+  ) async {
     final uri = request.uri.toString();
     final parts = uri.split(':');
     final host = parts[0];
@@ -129,12 +159,25 @@ class ProxyService {
         writeHeaders: false,
       );
 
-      // Двунаправленная передача данных
+      // Двунаправленная передача данных с DPI-обходом
+      final dpiMethods = config.type == ProxyType.http
+          ? [DpiMethod.httpSplit, DpiMethod.hostSpoof]
+          : <DpiMethod>[];
+
       await Future.wait([
         targetSocket.forEach((data) {
-          requestSocket.add(data);
+          _bytesReceived += data.length;
+          // Применяем DPI-обход к данным от сервера
+          if (dpiMethods.isNotEmpty) {
+            _dpiBypass.applyDpiMethods(data, dpiMethods).then((processed) {
+              requestSocket.add(processed);
+            });
+          } else {
+            requestSocket.add(data);
+          }
         }).catchError((_) {}),
         requestSocket.forEach((data) {
+          _bytesSent += data.length;
           targetSocket.add(data);
         }).catchError((_) {}),
       ]);
@@ -147,8 +190,11 @@ class ProxyService {
     }
   }
 
-  /// Обработка HTTP прокси-запроса
-  Future<void> _handleHttpProxy(HttpRequest request) async {
+  /// Обработка HTTP прокси-запроса с DPI-обходом
+  Future<void> _handleHttpProxy(
+    HttpRequest request,
+    ProxyConfig config,
+  ) async {
     final uri = request.uri;
     if (!uri.hasAuthority) {
       request.response.statusCode = HttpStatus.badRequest;
@@ -188,6 +234,9 @@ class ProxyService {
           await proxyResponse.cast<List<int>>().transform(utf8.decoder).join();
       request.response.write(responseBody);
       await request.response.close();
+
+      _bytesSent += request.contentLength;
+      _bytesReceived += proxyResponse.contentLength;
     } catch (e) {
       Logger.error('Ошибка HTTP прокси: $e');
       try {

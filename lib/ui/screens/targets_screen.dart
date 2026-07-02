@@ -40,7 +40,7 @@ class _TargetsScreenState extends State<TargetsScreen> {
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(gradient: AppTheme.surfaceGradient),
+        decoration: BoxDecoration(gradient: AppTheme.surfaceGradient),
         child: SafeArea(
           child: _targets.isEmpty
               ? _buildEmptyState()

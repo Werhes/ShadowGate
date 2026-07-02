@@ -67,7 +67,7 @@ class _TunConfigScreenState extends State<TunConfigScreen> {
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(gradient: AppTheme.surfaceGradient),
+        decoration: BoxDecoration(gradient: AppTheme.surfaceGradient),
         child: SafeArea(
           child: ListView(
             padding: const EdgeInsets.all(20),

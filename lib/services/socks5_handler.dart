@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import '../core/types.dart';
 import '../utils/logger.dart';
+import 'dpi_bypass_service.dart';
 
 /// Реализация SOCKS5 протокола (RFC 1928)
+/// С поддержкой DPI-обхода (zapret-style)
 class Socks5Handler {
   static const _socksVersion = 0x05;
 
@@ -33,8 +36,17 @@ class Socks5Handler {
   final Socket _client;
   final String? username;
   final String? password;
+  final DpiBypassService? _dpiBypass;
+  final void Function(int sent, int received)? _onTrafficUpdate;
 
-  Socks5Handler(this._client, {this.username, this.password});
+  Socks5Handler(
+    this._client, {
+    this.username,
+    this.password,
+    DpiBypassService? dpiBypass,
+    void Function(int sent, int received)? onTrafficUpdate,
+  })  : _dpiBypass = dpiBypass,
+        _onTrafficUpdate = onTrafficUpdate;
 
   /// Обработка SOCKS5-соединения
   Future<void> handle() async {
@@ -152,7 +164,7 @@ class Socks5Handler {
     }
   }
 
-  /// Обработка CONNECT
+  /// Обработка CONNECT с DPI-обходом
   Future<void> _handleConnect(SocksAddress address, int port) async {
     try {
       final targetSocket = await Socket.connect(address.host, port);
@@ -164,15 +176,32 @@ class Socks5Handler {
         bindPort: port,
       );
 
-      // Двунаправленная передача данных
+      // Двунаправленная передача данных с DPI-обходом
+      int sent = 0;
+      int received = 0;
+
       await Future.wait([
         targetSocket.forEach((data) {
-          _client.add(data);
+          received += data.length;
+          // Применяем DPI-обход к данным от сервера
+          if (_dpiBypass != null) {
+            _dpiBypass.applyDpiMethods(
+              data,
+              [DpiMethod.fragmentation, DpiMethod.hostSpoof],
+            ).then((processed) {
+              _client.add(processed);
+            });
+          } else {
+            _client.add(data);
+          }
         }).catchError((_) {}),
         _client.forEach((data) {
+          sent += data.length;
           targetSocket.add(data);
         }).catchError((_) {}),
       ]);
+
+      _onTrafficUpdate?.call(sent, received);
     } catch (e) {
       Logger.error('SOCKS5 CONNECT ошибка: $e');
       await _sendResponse(_repHostUnreachable);

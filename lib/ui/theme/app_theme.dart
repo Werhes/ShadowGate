@@ -1,14 +1,92 @@
 import 'package:flutter/material.dart';
 
-/// Тема приложения — Hiddify-стиль: тёмная, Material 3, глянцевые градиенты
+/// Типы тем приложения
+enum AppThemeType {
+  violet, // Фиолетовая (Hiddify-style)
+  amber, // Жёлтая/коричневая
+  emerald, // Изумрудная/зелёная
+  ruby, // Красная/рубиновая
+  ocean; // Синяя/океан
+
+  /// Отображаемое название темы
+  String get label {
+    switch (this) {
+      case AppThemeType.violet:
+        return 'Фиолетовая';
+      case AppThemeType.amber:
+        return 'Янтарная';
+      case AppThemeType.emerald:
+        return 'Изумрудная';
+      case AppThemeType.ruby:
+        return 'Рубиновая';
+      case AppThemeType.ocean:
+        return 'Океан';
+    }
+  }
+
+  /// Иконка темы
+  IconData get icon {
+    switch (this) {
+      case AppThemeType.violet:
+        return Icons.color_lens;
+      case AppThemeType.amber:
+        return Icons.wb_sunny;
+      case AppThemeType.emerald:
+        return Icons.eco;
+      case AppThemeType.ruby:
+        return Icons.favorite;
+      case AppThemeType.ocean:
+        return Icons.water_drop;
+    }
+  }
+
+  /// Цвет для предпросмотра
+  Color get previewColor {
+    switch (this) {
+      case AppThemeType.violet:
+        return const Color(0xFF8B5CF6);
+      case AppThemeType.amber:
+        return const Color(0xFFD97706);
+      case AppThemeType.emerald:
+        return const Color(0xFF059669);
+      case AppThemeType.ruby:
+        return const Color(0xFFDC2626);
+      case AppThemeType.ocean:
+        return const Color(0xFF0284C7);
+    }
+  }
+}
+
+/// Тема приложения — Hiddify-стиль с поддержкой кастомизации
 class AppTheme {
   AppTheme._();
 
-  // Цветовая палитра Hiddify
-  static const Color primaryColor = Color(0xFF8B5CF6);
-  static const Color primaryLight = Color(0xFFA78BFA);
-  static const Color secondaryColor = Color(0xFF06B6D4);
-  static const Color accentColor = Color(0xFFF43F5E);
+  // ===== Цвета по умолчанию (фиолетовая тема) =====
+  static const Color defaultPrimary = Color(0xFF8B5CF6);
+  static const Color defaultPrimaryLight = Color(0xFFA78BFA);
+  static const Color defaultSecondary = Color(0xFF06B6D4);
+
+  // ===== Янтарная тема =====
+  static const Color amberPrimary = Color(0xFFD97706);
+  static const Color amberPrimaryLight = Color(0xFFF59E0B);
+  static const Color amberSecondary = Color(0xFFFCD34D);
+
+  // ===== Изумрудная тема =====
+  static const Color emeraldPrimary = Color(0xFF059669);
+  static const Color emeraldPrimaryLight = Color(0xFF10B981);
+  static const Color emeraldSecondary = Color(0xFF34D399);
+
+  // ===== Рубиновая тема =====
+  static const Color rubyPrimary = Color(0xFFDC2626);
+  static const Color rubyPrimaryLight = Color(0xFFEF4444);
+  static const Color rubySecondary = Color(0xFFFB7185);
+
+  // ===== Океан тема =====
+  static const Color oceanPrimary = Color(0xFF0284C7);
+  static const Color oceanPrimaryLight = Color(0xFF38BDF8);
+  static const Color oceanSecondary = Color(0xFF7DD3FC);
+
+  // ===== Общие цвета =====
   static const Color surfaceColor = Color(0xFF1E1B2E);
   static const Color backgroundColor = Color(0xFF0F0D1A);
   static const Color cardColor = Color(0xFF1A1630);
@@ -20,29 +98,103 @@ class AppTheme {
   static const Color textSecondary = Color(0xFF9D97B5);
   static const Color textMuted = Color(0xFF6B6580);
 
-  static ThemeData get darkTheme {
+  /// Получение primary цвета по типу темы
+  static Color primaryFor(AppThemeType type) {
+    switch (type) {
+      case AppThemeType.violet:
+        return defaultPrimary;
+      case AppThemeType.amber:
+        return amberPrimary;
+      case AppThemeType.emerald:
+        return emeraldPrimary;
+      case AppThemeType.ruby:
+        return rubyPrimary;
+      case AppThemeType.ocean:
+        return oceanPrimary;
+    }
+  }
+
+  /// Получение primaryLight цвета по типу темы
+  static Color primaryLightFor(AppThemeType type) {
+    switch (type) {
+      case AppThemeType.violet:
+        return defaultPrimaryLight;
+      case AppThemeType.amber:
+        return amberPrimaryLight;
+      case AppThemeType.emerald:
+        return emeraldPrimaryLight;
+      case AppThemeType.ruby:
+        return rubyPrimaryLight;
+      case AppThemeType.ocean:
+        return oceanPrimaryLight;
+    }
+  }
+
+  /// Получение secondary цвета по типу темы
+  static Color secondaryFor(AppThemeType type) {
+    switch (type) {
+      case AppThemeType.violet:
+        return defaultSecondary;
+      case AppThemeType.amber:
+        return amberSecondary;
+      case AppThemeType.emerald:
+        return emeraldSecondary;
+      case AppThemeType.ruby:
+        return rubySecondary;
+      case AppThemeType.ocean:
+        return oceanSecondary;
+    }
+  }
+
+  /// Получение primary градиента по типу темы
+  static LinearGradient primaryGradientFor(AppThemeType type) {
+    return LinearGradient(
+      colors: [primaryFor(type), secondaryFor(type)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+  }
+
+  /// Получение glow градиента по типу темы
+  static LinearGradient glowGradientFor(AppThemeType type) {
+    return LinearGradient(
+      colors: [
+        primaryFor(type),
+        secondaryFor(type),
+        primaryFor(type),
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+  }
+
+  /// Создание ThemeData для указанного типа темы
+  static ThemeData themeFor(AppThemeType type) {
+    final primary = primaryFor(type);
+    final secondary = secondaryFor(type);
+
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: backgroundColor,
       colorScheme: ColorScheme.dark(
-        primary: primaryColor,
-        secondary: secondaryColor,
+        primary: primary,
+        secondary: secondary,
         surface: surfaceColor,
         error: errorColor,
         onPrimary: Colors.white,
         onSecondary: Colors.black,
         onSurface: textPrimary,
         onError: Colors.white,
-        primaryContainer: primaryColor.withValues(alpha: 0.15),
-        secondaryContainer: secondaryColor.withValues(alpha: 0.15),
+        primaryContainer: primary.withValues(alpha: 0.15),
+        secondaryContainer: secondary.withValues(alpha: 0.15),
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.transparent,
         foregroundColor: textPrimary,
-        titleTextStyle: TextStyle(
+        titleTextStyle: const TextStyle(
           color: textPrimary,
           fontSize: 20,
           fontWeight: FontWeight.bold,
@@ -64,7 +216,7 @@ class AppTheme {
             borderRadius: BorderRadius.circular(16),
           ),
           elevation: 0,
-          backgroundColor: primaryColor,
+          backgroundColor: primary,
           foregroundColor: Colors.white,
           textStyle: const TextStyle(
             fontSize: 16,
@@ -88,8 +240,8 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: primaryColor,
+          borderSide: BorderSide(
+            color: primary,
             width: 2,
           ),
         ),
@@ -101,17 +253,17 @@ class AppTheme {
           horizontal: 20,
           vertical: 16,
         ),
-        labelStyle: TextStyle(color: textSecondary),
-        hintStyle: TextStyle(color: textMuted),
+        labelStyle: const TextStyle(color: textSecondary),
+        hintStyle: const TextStyle(color: textMuted),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return primaryColor;
+          if (states.contains(WidgetState.selected)) return primary;
           return Colors.grey;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return primaryColor.withValues(alpha: 0.5);
+            return primary.withValues(alpha: 0.5);
           }
           return Colors.grey.withValues(alpha: 0.3);
         }),
@@ -119,7 +271,7 @@ class AppTheme {
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         type: BottomNavigationBarType.fixed,
         backgroundColor: surfaceColor,
-        selectedItemColor: primaryColor,
+        selectedItemColor: primary,
         unselectedItemColor: textMuted,
         elevation: 0,
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
@@ -130,7 +282,7 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: cardColor,
-        selectedColor: primaryColor.withValues(alpha: 0.3),
+        selectedColor: primary.withValues(alpha: 0.3),
         labelStyle: const TextStyle(color: textPrimary),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -145,46 +297,39 @@ class AppTheme {
     );
   }
 
-  /// Градиенты Hiddify
-  static const LinearGradient primaryGradient = LinearGradient(
-    colors: [primaryColor, secondaryColor],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+  // ===== Градиенты (для обратной совместимости) =====
+  static LinearGradient get primaryGradient =>
+      primaryGradientFor(AppThemeType.violet);
+  static LinearGradient get accentGradient => const LinearGradient(
+        colors: [errorColor, Color(0xFFFB7185)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+  static LinearGradient get successGradient => const LinearGradient(
+        colors: [successColor, Color(0xFF34D399)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+  static LinearGradient get surfaceGradient => const LinearGradient(
+        colors: [backgroundColor, surfaceColor],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      );
+  static LinearGradient get cardGradient => const LinearGradient(
+        colors: [cardColor, Color(0xFF1F1B3A)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+  static LinearGradient get glowGradient => glowGradientFor(AppThemeType.violet);
 
-  static const LinearGradient accentGradient = LinearGradient(
-    colors: [accentColor, Color(0xFFFB7185)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+  // ===== Константы для обратной совместимости =====
+  static Color get primaryColor => defaultPrimary;
+  static Color get primaryLight => defaultPrimaryLight;
+  static Color get secondaryColor => defaultSecondary;
+  static Color get accentColor => errorColor;
 
-  static const LinearGradient successGradient = LinearGradient(
-    colors: [successColor, Color(0xFF34D399)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const LinearGradient surfaceGradient = LinearGradient(
-    colors: [backgroundColor, surfaceColor],
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-  );
-
-  static const LinearGradient cardGradient = LinearGradient(
-    colors: [cardColor, Color(0xFF1F1B3A)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const LinearGradient glowGradient = LinearGradient(
-    colors: [
-      primaryColor,
-      secondaryColor,
-      primaryColor,
-    ],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+  /// Стандартная тёмная тема (фиолетовая)
+  static ThemeData get darkTheme => themeFor(AppThemeType.violet);
 }
 
 /// Декоративный контейнер с градиентом и глянцевым эффектом
@@ -265,9 +410,7 @@ class GradientButton extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        gradient: onPressed != null
-            ? effectiveGradient
-            : null,
+        gradient: onPressed != null ? effectiveGradient : null,
         color: onPressed == null
             ? Colors.grey.withValues(alpha: 0.3)
             : backgroundColor,

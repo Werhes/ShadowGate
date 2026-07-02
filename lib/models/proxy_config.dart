@@ -9,6 +9,9 @@ class ProxyConfig {
   final String? webSocketUrl;
   final String? username;
   final String? password;
+  /// Секрет для MTProto прокси (32 hex-символа)
+  /// Генерируется автоматически, если не указан
+  final String? mtprotoSecret;
 
   const ProxyConfig({
     this.type = ProxyType.socks5,
@@ -18,6 +21,7 @@ class ProxyConfig {
     this.webSocketUrl,
     this.username,
     this.password,
+    this.mtprotoSecret,
   });
 
   ProxyConfig copyWith({
@@ -28,6 +32,8 @@ class ProxyConfig {
     String? webSocketUrl,
     String? username,
     String? password,
+    String? mtprotoSecret,
+    bool clearMtprotoSecret = false,
   }) {
     return ProxyConfig(
       type: type ?? this.type,
@@ -37,6 +43,9 @@ class ProxyConfig {
       webSocketUrl: webSocketUrl ?? this.webSocketUrl,
       username: username ?? this.username,
       password: password ?? this.password,
+      mtprotoSecret: clearMtprotoSecret
+          ? null
+          : (mtprotoSecret ?? this.mtprotoSecret),
     );
   }
 
@@ -48,6 +57,7 @@ class ProxyConfig {
         'webSocketUrl': webSocketUrl,
         'username': username,
         'password': password,
+        'mtprotoSecret': mtprotoSecret,
       };
 
   factory ProxyConfig.fromJson(Map<String, dynamic> json) => ProxyConfig(
@@ -61,5 +71,6 @@ class ProxyConfig {
         webSocketUrl: json['webSocketUrl'] as String?,
         username: json['username'] as String?,
         password: json['password'] as String?,
+        mtprotoSecret: json['mtprotoSecret'] as String?,
       );
 }

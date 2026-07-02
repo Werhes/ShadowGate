@@ -1,4 +1,7 @@
+import 'dart:math' as dart_math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/types.dart';
@@ -44,6 +47,8 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
   @override
   Widget build(BuildContext context) {
     final isMtproto = _proxyType == ProxyType.mtproto;
+    final provider = context.watch<AppStateProvider>();
+    final secret = provider.state.proxyConfig.mtprotoSecret;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -70,7 +75,7 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(gradient: AppTheme.surfaceGradient),
+        decoration: BoxDecoration(gradient: AppTheme.surfaceGradient),
         child: SafeArea(
           child: Form(
             key: _formKey,
@@ -192,6 +197,131 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
 
                 if (isMtproto) ...[
                   const SizedBox(height: 24),
+
+                  // MTProto Secret
+                  const SectionHeader(title: 'MTProto Secret'),
+                  const SizedBox(height: 12),
+                  GlassCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.key,
+                                color: AppTheme.primaryColor, size: 20),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Secret для подключения',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppTheme.cardBorderColor.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: SelectableText(
+                            secret ?? 'не сгенерирован',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 14,
+                              color: secret != null
+                                  ? const Color(0xFF00E676)
+                                  : AppTheme.textSecondary,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: secret != null
+                                    ? () {
+                                        Clipboard.setData(
+                                          ClipboardData(text: secret),
+                                        );
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Secret скопирован в буфер обмена',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    : null,
+                                icon: const Icon(Icons.copy, size: 18),
+                                label: const Text('Копировать'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.primaryColor,
+                                  side: BorderSide(
+                                    color: AppTheme.primaryColor
+                                        .withValues(alpha: 0.5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  final newSecret = _generateSecret();
+                                  provider.updateProxyConfig(
+                                    provider.state.proxyConfig.copyWith(
+                                      mtprotoSecret: newSecret,
+                                    ),
+                                  );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Новый secret сгенерирован',
+                                      ),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.refresh, size: 18),
+                                label: const Text('Сгенерировать'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.primaryColor,
+                                  side: BorderSide(
+                                    color: AppTheme.primaryColor
+                                        .withValues(alpha: 0.5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Secret — это 32 hex-символа (16 байт), '
+                          'которые Telegram использует для шифрования соединения. '
+                          'Без secret подключение к MTProto прокси невозможно.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
                   GlassCard(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -215,8 +345,11 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
                         const SizedBox(height: 12),
                         const Text(
                           'Бесплатный MTProto прокси для Telegram. '
-                          'После запуска откройте ссылку tg://proxy?server=... '
-                          'в браузере или настройте прокси в Telegram вручную.',
+                          'После запуска откройте ссылку '
+                          'tg://proxy?server=...&port=...&secret=... '
+                          'в браузере или настройте прокси в Telegram вручную.\n\n'
+                          'Secret генерируется автоматически при запуске, '
+                          'если не указан вручную.',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppTheme.textSecondary,
@@ -233,6 +366,13 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
         ),
       ),
     );
+  }
+
+  /// Генерация случайного MTProto secret (32 hex-символа)
+  String _generateSecret() {
+    final random = dart_math.Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
   void _save() {
