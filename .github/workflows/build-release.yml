@@ -44,6 +44,9 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Setup Visual Studio
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Install dependencies
         run: flutter pub get
 
