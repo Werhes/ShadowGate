@@ -2,6 +2,7 @@ use crate::cfproxy::*;
 use crate::config::*;
 use crate::crypto::*;
 use crate::ws::*;
+use crate::{ldebug, linfo, lwarn};
 use byteorder::{ByteOrder, LittleEndian};
 use rand::RngCore;
 use sha2::{Digest, Sha256};

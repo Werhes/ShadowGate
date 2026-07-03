@@ -1,4 +1,5 @@
 use crate::config::*;
+use crate::lerror;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
 use tokio_util::sync::CancellationToken;

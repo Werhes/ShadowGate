@@ -43,12 +43,10 @@ socket2 = "0.5"
 
 # Логирование
 log = "0.4"
+env_logger = "0.11"
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.14"
-
-[target.'cfg(target_os = "windows")'.dependencies]
-env_logger = "0.11"
 
 [features]
 default = ["android"]
