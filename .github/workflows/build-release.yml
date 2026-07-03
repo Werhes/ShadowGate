@@ -59,8 +59,8 @@ jobs:
 
       - name: Copy mtproto_proxy.dll to Flutter build output
         run: |
-          mkdir -p build\windows\x64\runner\Release
-          copy /Y native\mtproto_proxy\target\x86_64-pc-windows-msvc\release\mtproto_proxy.dll build\windows\x64\runner\Release\
+          New-Item -ItemType Directory -Force -Path build\windows\x64\runner\Release | Out-Null
+          Copy-Item -Force native\mtproto_proxy\target\x86_64-pc-windows-msvc\release\mtproto_proxy.dll build\windows\x64\runner\Release\
 
       - name: Verify native library
         run: |
