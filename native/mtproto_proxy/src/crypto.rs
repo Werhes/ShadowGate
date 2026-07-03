@@ -1,6 +1,6 @@
 use crate::config::ZERO64;
 use aes::cipher::{KeyIvInit, StreamCipher};
-use byteorder::{BigEndian, LittleEndian};
+use byteorder::{ByteOrder, LittleEndian};
 
 type Aes256Ctr = ctr::Ctr64BE<aes::Aes256>;
 

@@ -26,7 +26,6 @@ on:
 env:
   APP_NAME: ShadowGate
   APP_DESCRIPTION: "VPN/Proxy/MTProto application with DPI bypass capabilities"
-  ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/r27c
 
 jobs:
   # ============================================================
@@ -136,8 +135,6 @@ jobs:
             -t i686-linux-android \
             -o ../../android/app/src/main/jniLibs \
             build --release
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
 
       - name: Verify native libraries
         run: |

@@ -347,20 +347,6 @@ pub async fn handle_client(pool: Arc<WsPool>, mut conn: TcpStream, cancel_token:
     bridge_ws(conn, ws, label, dc, target, 443, is_media, splitter,
         clt_decryptor, clt_encryptor, tg_encryptor, tg_decryptor, cancel_token).await;
 }
-use crate::config::*;
-use crate::crypto::*;
-use crate::ws::*;
-use byteorder::{ByteOrder, LittleEndian};
-use rand::RngCore;
-use sha2::{Digest, Sha256};
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::Mutex;
-use tokio_util::sync::CancellationToken;
 
 // ---------------------------------------------------------------------------
 // Log helpers for proxy module

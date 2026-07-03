@@ -1,7 +1,6 @@
 use crate::config::*;
-use crate::ws::{is_http_status_error, ws_connect_once, RawWebSocket, WsError};
+use crate::ws::{ws_connect_once, RawWebSocket, WsError};
 use serde::Deserialize;
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tokio::sync::Semaphore;
 

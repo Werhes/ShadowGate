@@ -1,10 +1,5 @@
 use crate::config::*;
-use crate::proxy::parse_cidr_pool;
-use std::collections::HashMap;
-use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
-use std::sync::atomic::Ordering;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
 use tokio_util::sync::CancellationToken;
 
@@ -34,15 +29,16 @@ pub async fn run_pipe_server(cancel_token: CancellationToken) {
                     continue;
                 }
 
-                let (reader, mut writer) = server.split();
-                let mut buf_reader = BufReader::new(reader);
-                let mut line = String::new();
-
-                match buf_reader.read_line(&mut line).await {
+                // NamedPipeServer реализует AsyncRead + AsyncWrite,
+                // но не AsyncBufRead, поэтому split() не работает.
+                // Читаем напрямую через read().
+                let mut buf = vec![0u8; 4096];
+                match server.read(&mut buf).await {
                     Ok(0) | Err(_) => continue,
-                    Ok(_) => {
-                        let response = handle_pipe_command(line.trim());
-                        if let Err(e) = writer.write_all(response.as_bytes()).await {
+                    Ok(n) => {
+                        let cmd = String::from_utf8_lossy(&buf[..n]).trim().to_string();
+                        let response = handle_pipe_command(&cmd);
+                        if let Err(e) = server.write_all(response.as_bytes()).await {
                             lerror!("Pipe write error: {}", e);
                         }
                     }
@@ -80,27 +76,25 @@ pub fn send_pipe_command(command: &str) -> Result<String, String> {
         .map_err(|e| e.to_string())?;
 
     rt.block_on(async {
-        let client = ClientOptions::new()
+        let mut client = ClientOptions::new()
             .open(PIPE_NAME)
             .map_err(|e| format!("Failed to open pipe: {}", e))?;
 
-        let (mut writer, reader) = client.split();
-        
         // Отправляем команду
         let cmd = format!("{}\n", command);
-        writer
+        client
             .write_all(cmd.as_bytes())
             .await
             .map_err(|e| format!("Failed to write to pipe: {}", e))?;
 
-        // Читаем ответ
-        let mut buf_reader = BufReader::new(reader);
-        let mut response = String::new();
-        buf_reader
-            .read_line(&mut response)
+        // Читаем ответ — NamedPipeClient реализует AsyncRead
+        let mut buf = vec![0u8; 4096];
+        let n = client
+            .read(&mut buf)
             .await
             .map_err(|e| format!("Failed to read from pipe: {}", e))?;
 
-        Ok(response.trim().to_string())
+        let response = String::from_utf8_lossy(&buf[..n]).trim().to_string();
+        Ok(response)
     })
 }
