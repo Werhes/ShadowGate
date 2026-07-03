@@ -28,6 +28,18 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Подключаем jniLibs для нативной Rust-библиотеки
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+        }
+    }
+
+    // Указываем путь к jniLibs для нативных библиотек
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDirs("src/main/jniLibs")
+        }
     }
 
     buildTypes {
@@ -42,3 +54,22 @@ android {
 flutter {
     source = "../.."
 }
+
+// ============================================================
+// Task: сборка Rust-библиотеки для Android
+// ============================================================
+// Запуск: ./gradlew buildRust
+// Требуется: cargo-ndk (cargo install cargo-ndk)
+//            Android NDK (установлен через SDK Manager)
+
+tasks.register<Exec>("buildRust") {
+    description = "Build Rust native library for Android using cargo-ndk"
+    workingDir = file("../../native/mtproto_proxy")
+    commandLine("bash", "build_android.sh")
+}
+
+// Автоматическая сборка Rust перед сборкой APK (опционально)
+// Раскомментируйте если cargo-ndk установлен:
+// tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders") }.configureEach {
+//     dependsOn("buildRust")
+// }

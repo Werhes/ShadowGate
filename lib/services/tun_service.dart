@@ -1,21 +1,22 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
-import '../core/types.dart';
 import '../models/tun_config.dart';
 import '../utils/logger.dart';
-import 'dpi_bypass_service.dart';
 import 'platform_channel_service.dart';
 
 /// Сервис для управления TUN-интерфейсом
 /// Работает через platform channels:
-/// - Android: VpnService
-/// - Windows: WinDivert (через нативный плагин)
-/// - iOS/macOS: NEPacketTunnelProvider
+/// - Android: VpnService (реализован в ShadowVpnService.kt)
+/// - iOS: NEPacketTunnelProvider (реализован в ShadowTunPlugin.swift)
+/// - Windows: WinDivert (требуется нативный плагин C++)
+/// - macOS: NEPacketTunnelProvider (реализован в ShadowTunPlugin.swift)
 ///
 /// Применяет DPI-обход (zapret-style) к проходящему трафику
+/// Обработка пакетов происходит в PlatformChannelService
+/// (на Android — через MethodChannel обратно в Dart)
 class TunService {
   bool _isRunning = false;
-  final DpiBypassService _dpiBypass = DpiBypassService();
   final PlatformChannelService _platformChannel = PlatformChannelService();
   Timer? _statsTimer;
   int _bytesSent = 0;
@@ -28,11 +29,23 @@ class TunService {
   int get bytesSent => _bytesSent;
   int get bytesReceived => _bytesReceived;
 
+  /// Проверка поддержки TUN на текущей платформе
+  bool get isSupported =>
+      Platform.isAndroid || Platform.isIOS || Platform.isWindows;
+
   /// Запуск TUN-интерфейса
   Future<void> start(TunConfig config) async {
     if (_isRunning) {
       Logger.warn('TUN-интерфейс уже запущен');
       return;
+    }
+
+    // Проверка поддержки платформы
+    if (!isSupported) {
+      throw UnsupportedError(
+        'TUN-режим поддерживается только на Android, iOS и Windows. '
+        'Используйте режим "Прокси" или "MTProto".',
+      );
     }
 
     try {
@@ -42,21 +55,26 @@ class TunService {
         'Методы DPI: ${config.enabledMethods.map((m) => m.label).join(', ')}',
       );
 
-      // Запрашиваем VPN-разрешение (Android) или проверяем админ-права (Windows)
+      // Передаём методы DPI в PlatformChannelService для обработки пакетов
+      _platformChannel.setDpiMethods(config.enabledMethods);
+
+      // Подключаем колбэк статистики
+      _platformChannel.onTrafficUpdate = (sent, received) {
+        _bytesSent += sent;
+        _bytesReceived += received;
+      };
+
+      // Запрашиваем VPN-разрешение (Android / iOS)
       final hasPermission = await _platformChannel.requestVpnPermission();
       if (!hasPermission) {
-        Logger.warn('VPN разрешение не получено, продолжаем...');
+        throw Exception(
+          'Не получено разрешение VPN. '
+          'Пожалуйста, разрешите ShadowGate создавать VPN-соединение.',
+        );
       }
 
-      // Запускаем TUN через platform channel
-      final tunConfig = {
-        'interfaceName': config.interfaceName,
-        'mtu': config.mtu,
-        'dns': config.dnsServer,
-        'bypassLocalTraffic': config.bypassLocalTraffic,
-        'enabledMethods':
-            config.enabledMethods.map((m) => m.name).toList(),
-      };
+      // Адаптируем конфигурацию под платформу
+      final tunConfig = _buildPlatformConfig(config);
 
       final started = await _platformChannel.startTun(tunConfig);
       if (!started) {
@@ -76,6 +94,36 @@ class TunService {
     }
   }
 
+  /// Построение конфигурации с учётом платформы
+  Map<String, dynamic> _buildPlatformConfig(TunConfig config) {
+    final platformConfig = <String, dynamic>{
+      'interfaceName': config.interfaceName,
+      'mtu': config.mtu,
+      'dns': config.dnsServer,
+      'bypassLocalTraffic': config.bypassLocalTraffic,
+      'enabledMethods':
+          config.enabledMethods.map((m) => m.name).toList(),
+    };
+
+    // iOS-specific настройки
+    if (Platform.isIOS) {
+      // iOS требует IPv4 и IPv6 DNS
+      platformConfig['dns'] = config.dnsServer ?? '8.8.8.8';
+      // iOS NEPacketTunnelProvider использует свои имена интерфейсов
+      platformConfig['interfaceName'] = 'utun2';
+      // Для iOS добавляем дополнительные параметры
+      platformConfig['ipv4Address'] = '10.8.0.2';
+      platformConfig['ipv4SubnetMask'] = '255.255.255.0';
+      platformConfig['ipv6Address'] = 'fd00:1:2:3::2';
+      platformConfig['ipv6PrefixLength'] = 64;
+      // iOS требует указания включенных прокси
+      platformConfig['proxyServerPort'] = 0;
+      platformConfig['proxyServerAddress'] = '';
+    }
+
+    return platformConfig;
+  }
+
   /// Остановка TUN-интерфейса
   Future<void> stop() async {
     if (!_isRunning) return;
@@ -91,19 +139,5 @@ class TunService {
       Logger.error('Ошибка остановки TUN: $e');
       rethrow;
     }
-  }
-
-  /// Обработка входящего пакета из TUN с DPI-обходом
-  Future<List<int>> processIncomingPacket(
-    List<int> packet,
-    List<DpiMethod> methods,
-  ) async {
-    _bytesReceived += packet.length;
-    return _dpiBypass.applyDpiMethods(packet, methods);
-  }
-
-  /// Обработка исходящего пакета в TUN
-  void processOutgoingPacket(List<int> packet) {
-    _bytesSent += packet.length;
   }
 }

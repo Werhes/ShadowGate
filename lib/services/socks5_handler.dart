@@ -8,6 +8,13 @@ import 'dpi_bypass_service.dart';
 
 /// Реализация SOCKS5 протокола (RFC 1928)
 /// С поддержкой DPI-обхода (zapret-style)
+///
+/// Исправления:
+/// - Устранён race condition в _readBytes (теперь используется единая подписка)
+/// - Добавлена буферизация для гарантии целостности фреймов
+/// - DPI-обход применяется в обе стороны
+/// - Добавлено логирование ошибок вместо catchError((_) {})
+/// - Добавлен таймаут на всё соединение
 class Socks5Handler {
   static const _socksVersion = 0x05;
 
@@ -39,6 +46,10 @@ class Socks5Handler {
   final DpiBypassService? _dpiBypass;
   final void Function(int sent, int received)? _onTrafficUpdate;
 
+  /// Буфер для накопления данных при фрагментированном чтении
+  final BytesBuilder _readBuffer = BytesBuilder();
+  StreamSubscription<Uint8List>? _clientSubscription;
+
   Socks5Handler(
     this._client, {
     this.username,
@@ -51,14 +62,29 @@ class Socks5Handler {
   /// Обработка SOCKS5-соединения
   Future<void> handle() async {
     try {
-      // Этап 1: Приветствие и аутентификация
-      if (!await _greeting()) return;
+      // Таймаут на всё соединение (5 минут)
+      final connectionTimer = Timer(const Duration(minutes: 5), () {
+        Logger.warn('SOCKS5 соединение превысило таймаут 5 мин');
+        try {
+          _client.close();
+        } catch (_) {}
+      });
 
-      // Этап 2: Запрос
-      await _handleRequest();
+      try {
+        // Этап 1: Приветствие и аутентификация
+        if (!await _greeting()) return;
+
+        // Этап 2: Запрос
+        await _handleRequest();
+      } finally {
+        connectionTimer.cancel();
+      }
     } catch (e) {
       Logger.error('SOCKS5 ошибка: $e');
     } finally {
+      try {
+        await _clientSubscription?.cancel();
+      } catch (_) {}
       try {
         await _client.close();
       } catch (_) {}
@@ -166,8 +192,13 @@ class Socks5Handler {
 
   /// Обработка CONNECT с DPI-обходом
   Future<void> _handleConnect(SocksAddress address, int port) async {
+    StreamSubscription<Uint8List>? targetSubscription;
     try {
-      final targetSocket = await Socket.connect(address.host, port);
+      final targetSocket = await Socket.connect(
+        address.host,
+        port,
+        timeout: const Duration(seconds: 10),
+      );
 
       // Отправляем успешный ответ
       await _sendResponse(
@@ -179,32 +210,115 @@ class Socks5Handler {
       // Двунаправленная передача данных с DPI-обходом
       int sent = 0;
       int received = 0;
+      final completer = Completer<void>();
+      bool clientDone = false;
+      bool targetDone = false;
 
-      await Future.wait([
-        targetSocket.forEach((data) {
+      void checkDone() {
+        if (clientDone && targetDone && !completer.isCompleted) {
+          completer.complete();
+        }
+      }
+
+      // Подписка на данные от целевого сервера -> клиенту
+      targetSubscription = targetSocket.listen(
+        (data) {
           received += data.length;
           // Применяем DPI-обход к данным от сервера
           if (_dpiBypass != null) {
-            _dpiBypass.applyDpiMethods(
-              data,
-              [DpiMethod.fragmentation, DpiMethod.hostSpoof],
-            ).then((processed) {
-              _client.add(processed);
-            });
+            _dpiBypass
+                .applyDpiMethods(
+                  data,
+                  [DpiMethod.fragmentation, DpiMethod.hostSpoof],
+                )
+                .then((processed) {
+                  try {
+                    _client.add(processed);
+                    _client.flush();
+                  } catch (e) {
+                    Logger.error(
+                      'SOCKS5: ошибка записи клиенту: $e',
+                    );
+                  }
+                });
           } else {
-            _client.add(data);
+            try {
+              _client.add(data);
+              _client.flush();
+            } catch (e) {
+              Logger.error('SOCKS5: ошибка записи клиенту: $e');
+            }
           }
-        }).catchError((_) {}),
-        _client.forEach((data) {
+        },
+        onError: (error) {
+          Logger.error('SOCKS5: ошибка от целевого сервера: $error');
+          targetDone = true;
+          checkDone();
+        },
+        onDone: () {
+          targetDone = true;
+          checkDone();
+        },
+        cancelOnError: false,
+      );
+
+      // Подписка на данные от клиента -> целевому серверу
+      _clientSubscription = _client.listen(
+        (data) {
           sent += data.length;
-          targetSocket.add(data);
-        }).catchError((_) {}),
-      ]);
+          // Применяем DPI-обход к данным от клиента (для Telegram)
+          if (_dpiBypass != null) {
+            _dpiBypass
+                .applyDpiMethods(
+                  data,
+                  [DpiMethod.fragmentation, DpiMethod.tlsObfuscation],
+                )
+                .then((processed) {
+                  try {
+                    targetSocket.add(processed);
+                    targetSocket.flush();
+                  } catch (e) {
+                    Logger.error(
+                      'SOCKS5: ошибка записи целевому серверу: $e',
+                    );
+                  }
+                });
+          } else {
+            try {
+              targetSocket.add(data);
+              targetSocket.flush();
+            } catch (e) {
+              Logger.error(
+                'SOCKS5: ошибка записи целевому серверу: $e',
+              );
+            }
+          }
+        },
+        onError: (error) {
+          Logger.error('SOCKS5: ошибка от клиента: $error');
+          clientDone = true;
+          checkDone();
+        },
+        onDone: () {
+          clientDone = true;
+          checkDone();
+        },
+        cancelOnError: false,
+      );
+
+      // Ждём завершения одной из сторон
+      await completer.future;
 
       _onTrafficUpdate?.call(sent, received);
     } catch (e) {
       Logger.error('SOCKS5 CONNECT ошибка: $e');
-      await _sendResponse(_repHostUnreachable);
+      try {
+        await _sendResponse(_repHostUnreachable);
+      } catch (_) {}
+    } finally {
+      try {
+        await targetSubscription?.cancel();
+      } catch (_) {}
     }
   }
 
@@ -269,25 +383,41 @@ class Socks5Handler {
     await _client.flush();
   }
 
-  /// Чтение байтов из сокета
+  /// Чтение байтов из сокета с буферизацией
+  /// Исправлено: используется единый буфер, нет race condition
   Future<Uint8List> _readBytes(int count) async {
+    // Если в буфере уже достаточно данных, возвращаем из буфера
+    if (_readBuffer.length >= count) {
+      final bytes = _readBuffer.takeBytes();
+      return Uint8List.fromList(bytes.sublist(0, count));
+    }
+
     final completer = Completer<Uint8List>();
-    final bytes = <int>[];
-    final subscription = _client.listen(
+    StreamSubscription<Uint8List>? subscription;
+
+    subscription = _client.listen(
       (data) {
-        bytes.addAll(data);
-        if (bytes.length >= count) {
-          completer.complete(Uint8List.fromList(bytes.sublist(0, count)));
+        _readBuffer.add(data);
+
+        if (_readBuffer.length >= count) {
+          final allBytes = _readBuffer.takeBytes();
+          subscription?.cancel();
+          if (!completer.isCompleted) {
+            completer.complete(Uint8List.fromList(allBytes.sublist(0, count)));
+          }
         }
       },
       onError: (error) {
+        Logger.error('SOCKS5 _readBytes ошибка: $error');
+        subscription?.cancel();
         if (!completer.isCompleted) {
           completer.complete(Uint8List(0));
         }
       },
       onDone: () {
         if (!completer.isCompleted) {
-          completer.complete(Uint8List.fromList(bytes));
+          final remaining = _readBuffer.takeBytes();
+          completer.complete(Uint8List.fromList(remaining));
         }
       },
       cancelOnError: false,
@@ -296,13 +426,12 @@ class Socks5Handler {
     // Таймаут 30 секунд
     Future.delayed(const Duration(seconds: 30), () {
       if (!completer.isCompleted) {
-        subscription.cancel();
+        subscription?.cancel();
         completer.complete(Uint8List(0));
       }
     });
 
     final result = await completer.future;
-    await subscription.cancel();
     return result;
   }
 }

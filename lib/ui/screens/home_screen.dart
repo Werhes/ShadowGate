@@ -247,6 +247,12 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Secret',
               value: state.proxyConfig.mtprotoSecret ?? 'будет сгенерирован при запуске',
             ),
+            const SizedBox(height: 12),
+            _ConfigRow(
+              icon: Icons.security,
+              label: 'Fake TLS',
+              value: state.proxyConfig.useFakeTls ? 'Включён (рекомендуется)' : 'Выключен',
+            ),
           ] else ...[
             _ConfigRow(
               icon: Icons.settings_ethernet,

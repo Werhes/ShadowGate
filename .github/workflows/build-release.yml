@@ -26,6 +26,7 @@ on:
 env:
   APP_NAME: ShadowGate
   APP_DESCRIPTION: "VPN/Proxy/MTProto application with DPI bypass capabilities"
+  ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/r27c
 
 jobs:
   # ============================================================
@@ -47,6 +48,26 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build Rust native library for Windows (mtproto_proxy.dll)
+        run: |
+          cd native/mtproto_proxy
+          cargo build --release --features windows --target x86_64-pc-windows-msvc
+
+      - name: Copy mtproto_proxy.dll to Flutter build output
+        run: |
+          mkdir -p build\windows\x64\runner\Release
+          copy /Y native\mtproto_proxy\target\x86_64-pc-windows-msvc\release\mtproto_proxy.dll build\windows\x64\runner\Release\
+
+      - name: Verify native library
+        run: |
+          echo "=== mtproto_proxy.dll ==="
+          dir native\mtproto_proxy\target\x86_64-pc-windows-msvc\release\mtproto_proxy.dll
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -66,6 +87,7 @@ jobs:
 
   # ============================================================
   # СБОРКА ДЛЯ ANDROID (APK + AAB)
+  # Включает сборку нативной Rust-библиотеки для MTProto прокси
   # ============================================================
   build_android:
     name: Build Android
@@ -85,6 +107,42 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >
+            aarch64-linux-android,
+            armv7-linux-androideabi,
+            x86_64-linux-android,
+            i686-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+          add-to-path: true
+
+      - name: Build Rust native library for Android
+        run: |
+          cd native/mtproto_proxy
+          cargo ndk \
+            -t aarch64-linux-android \
+            -t armv7-linux-androideabi \
+            -t x86_64-linux-android \
+            -t i686-linux-android \
+            -o ../../android/app/src/main/jniLibs \
+            build --release
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+
+      - name: Verify native libraries
+        run: |
+          echo "=== Native libraries ==="
+          find android/app/src/main/jniLibs -name "*.so" -exec ls -lh {} \;
 
       - name: Install dependencies
         run: flutter pub get
@@ -109,6 +167,11 @@ jobs:
 
   # ============================================================
   # СБОРКА ДЛЯ iOS (только на macOS)
+  # Включает:
+  #   - Сборка Rust-библиотеки (libmtproto_proxy.a) для arm64 + simulator
+  #   - Основное приложение (Runner.app)
+  #   - Packet Tunnel Provider extension (ShadowTunnel.appex)
+  #   - Создание IPA с корректной структурой Payload/
   # ============================================================
   build_ios:
     name: Build iOS
@@ -123,18 +186,105 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >
+            aarch64-apple-ios,
+            aarch64-apple-ios-sim,
+            x86_64-apple-ios
+
+      - name: Build Rust native library for iOS
+        run: |
+          cd native/mtproto_proxy
+
+          # Сборка для arm64 (физические устройства)
+          cargo build --release --features ios --target aarch64-apple-ios
+
+          # Сборка для симулятора (arm64 + x86_64)
+          cargo build --release --features ios --target aarch64-apple-ios-sim
+          cargo build --release --features ios --target x86_64-apple-ios
+
+          # Создаём универсальную библиотеку для симулятора через lipo
+          mkdir -p target/universal-sim
+          lipo -create \
+            target/aarch64-apple-ios-sim/release/libmtproto_proxy.a \
+            target/x86_64-apple-ios/release/libmtproto_proxy.a \
+            -output target/universal-sim/libmtproto_proxy.a
+
+          # Копируем .a файлы в Xcode проект
+          mkdir -p ../../ios/Runner/Libraries
+          cp target/aarch64-apple-ios/release/libmtproto_proxy.a \
+            ../../ios/Runner/Libraries/libmtproto_proxy_device.a
+          cp target/universal-sim/libmtproto_proxy.a \
+            ../../ios/Runner/Libraries/libmtproto_proxy_sim.a
+
+          # Копируем C header
+          cp mtproto_proxy.h ../../ios/Runner/Libraries/
+
+          echo "=== iOS native libraries ==="
+          ls -lh ../../ios/Runner/Libraries/
+
+      - name: Install CocoaPods
+        run: |
+          gem install cocoapods
+          pod repo update --silent
+
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build iOS (Release)
-        run: flutter build ios --release --no-codesign
-
-      - name: Create iOS archive
+      - name: Install Pods
         run: |
-          cd build/ios/iphoneos
-          mkdir -p Payload
-          cp -r Runner.app Payload/
-          zip -r ${{ runner.temp }}/ShadowGate-iOS.ipa Payload/
+          cd ios
+          pod install --repo-update
+
+      - name: Build iOS (Release) with development signing
+        run: |
+          # Сборка с development signing для CI (без Apple Developer аккаунта)
+          # Для публикации в App Store нужно заменить на ручную подпись
+          flutter build ios --release --no-codesign
+
+      - name: Build Packet Tunnel Provider extension
+        run: |
+          # Собираем NEPacketTunnelProvider extension
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/ios \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            build
+
+      - name: Prepare IPA structure with extension
+        run: |
+          # Создаём структуру IPA с Packet Tunnel Provider
+          APP_DIR="build/ios/iphoneos"
+          PAYLOAD_DIR="$APP_DIR/Payload"
+          EXTENSION_PATH="$APP_DIR/Payload/Runner.app/PlugIns/ShadowTunnel.appex"
+          
+          mkdir -p "$PAYLOAD_DIR"
+          cp -r "$APP_DIR/Runner.app" "$PAYLOAD_DIR/"
+          
+          # Создаём каталог для PlugIns если его нет
+          mkdir -p "$PAYLOAD_DIR/Runner.app/PlugIns"
+          
+          # Копируем extension если он был собран
+          if [ -d "build/ios/Build/Products/Release-iphoneos/ShadowTunnel.appex" ]; then
+            cp -r "build/ios/Build/Products/Release-iphoneos/ShadowTunnel.appex" \
+              "$PAYLOAD_DIR/Runner.app/PlugIns/"
+            echo "✅ Packet Tunnel Provider extension добавлен в IPA"
+          else
+            echo "⚠️ Extension не найден, IPA будет без NEPacketTunnelProvider"
+          fi
+          
+          # Создаём IPA
+          cd "$APP_DIR"
+          zip -r "${{ runner.temp }}/ShadowGate-iOS.ipa" Payload/
+          
+          echo "✅ IPA создан: ${{ runner.temp }}/ShadowGate-iOS.ipa"
 
       - name: Upload iOS artifact
         uses: actions/upload-artifact@v4
@@ -245,16 +395,10 @@ jobs:
             
             **Версия:** `${{ steps.release_info.outputs.version }}`
             **Статус:** ${{ job.status == 'success' && '✅ Успешно' || '❌ Ошибка' }}
-            **Пре-релиз:** ${{ steps.release_info.outputs.prerelease == 'true' && 'Да' || 'Нет' }}
-            
-            **Платформы:**
-            ${{ needs.build_windows.result == 'success' && '✅ Windows' || '❌ Windows' }}
-            ${{ needs.build_android.result == 'success' && '✅ Android' || '❌ Android' }}
-            ${{ needs.build_ios.result == 'success' && '✅ iOS' || '❌ iOS' }}
-            ${{ needs.build_macos.result == 'success' && '✅ macOS' || '❌ macOS' }}
-            
             **Название:** ${{ steps.release_info.outputs.title != '' && steps.release_info.outputs.title || format('{0} v{1}', env.APP_NAME, steps.release_info.outputs.version) }}
             
             ${{ steps.release_info.outputs.notes != '' && format('**Описание:**\n{0}', steps.release_info.outputs.notes) || '' }}
             
             🔗 [Скачать релиз](${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.release_info.outputs.version }})
+
+            Собрано автоматически через GitHub Actions.

@@ -8,6 +8,12 @@ import UIKit
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+    
+    // Регистрируем ShadowTunPlugin для поддержки TUN на iOS
+    ShadowTunPlugin.register(
+      with: self.registrar(forPlugin: "ShadowTunPlugin")!
+    )
+    
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }

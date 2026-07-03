@@ -12,6 +12,9 @@ class ProxyConfig {
   /// Секрет для MTProto прокси (32 hex-символа)
   /// Генерируется автоматически, если не указан
   final String? mtprotoSecret;
+  /// Использовать Fake TLS режим для MTProto (secret с префиксом "dd")
+  /// Рекомендуется для обхода DPI в России
+  final bool useFakeTls;
 
   const ProxyConfig({
     this.type = ProxyType.socks5,
@@ -22,6 +25,7 @@ class ProxyConfig {
     this.username,
     this.password,
     this.mtprotoSecret,
+    this.useFakeTls = true,
   });
 
   ProxyConfig copyWith({
@@ -33,6 +37,7 @@ class ProxyConfig {
     String? username,
     String? password,
     String? mtprotoSecret,
+    bool? useFakeTls,
     bool clearMtprotoSecret = false,
   }) {
     return ProxyConfig(
@@ -46,6 +51,7 @@ class ProxyConfig {
       mtprotoSecret: clearMtprotoSecret
           ? null
           : (mtprotoSecret ?? this.mtprotoSecret),
+      useFakeTls: useFakeTls ?? this.useFakeTls,
     );
   }
 
@@ -58,6 +64,7 @@ class ProxyConfig {
         'username': username,
         'password': password,
         'mtprotoSecret': mtprotoSecret,
+        'useFakeTls': useFakeTls,
       };
 
   factory ProxyConfig.fromJson(Map<String, dynamic> json) => ProxyConfig(
@@ -72,5 +79,6 @@ class ProxyConfig {
         username: json['username'] as String?,
         password: json['password'] as String?,
         mtprotoSecret: json['mtprotoSecret'] as String?,
+        useFakeTls: json['useFakeTls'] as bool? ?? true,
       );
 }

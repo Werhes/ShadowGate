@@ -45,5 +45,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Network Extension для VPN (NEPacketTunnelProvider) -->
+	<key>com.apple.developer.networking.vpn.api.allow</key>
+	<true/>
 </dict>
 </plist>

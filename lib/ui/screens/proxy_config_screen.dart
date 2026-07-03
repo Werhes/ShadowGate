@@ -23,6 +23,7 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
   late TextEditingController _wsUrlController;
   late ProxyType _proxyType;
   late bool _useWebSocket;
+  late bool _useFakeTls;
   final _formKey = GlobalKey<FormState>();
 
   @override
@@ -34,6 +35,19 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
     _wsUrlController = TextEditingController(text: config.webSocketUrl ?? '');
     _proxyType = config.type;
     _useWebSocket = config.useWebSocket;
+    _useFakeTls = config.useFakeTls;
+
+    // Автоматически генерируем MTProto secret, если его нет
+    if (config.mtprotoSecret == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final provider = context.read<AppStateProvider>();
+        final newSecret = _generateSecret();
+        provider.updateProxyConfig(
+          provider.state.proxyConfig.copyWith(mtprotoSecret: newSecret),
+        );
+      });
+    }
   }
 
   @override
@@ -322,6 +336,46 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
                   ),
 
                   const SizedBox(height: 24),
+
+                  // Fake TLS
+                  const SectionHeader(title: 'Fake TLS'),
+                  const SizedBox(height: 12),
+                  GlassCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        SwitchListTile(
+                          title: const Text('Fake TLS (рекомендуется)'),
+                          subtitle: const Text(
+                            'Маскировка трафика под HTTPS. '
+                            'Secret с префиксом "dd". '
+                            'Наиболее эффективный метод обхода DPI.',
+                          ),
+                          value: _useFakeTls,
+                          onChanged: (value) {
+                            setState(() {
+                              _useFakeTls = value;
+                              // Автоматически генерируем новый secret
+                              // при смене режима
+                              final provider = context.read<AppStateProvider>();
+                              final newSecret = value
+                                  ? 'dd${_generateSecret()}'
+                                  : _generateSecret();
+                              provider.updateProxyConfig(
+                                provider.state.proxyConfig.copyWith(
+                                  mtprotoSecret: newSecret,
+                                  useFakeTls: value,
+                                ),
+                              );
+                            });
+                          },
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
                   GlassCard(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -349,7 +403,10 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
                           'tg://proxy?server=...&port=...&secret=... '
                           'в браузере или настройте прокси в Telegram вручную.\n\n'
                           'Secret генерируется автоматически при запуске, '
-                          'если не указан вручную.',
+                          'если не указан вручную.\n\n'
+                          'Fake TLS — secret с префиксом "dd" — '
+                          'маскирует MTProto трафик под обычный HTTPS, '
+                          'что позволяет обходить DPI даже при глубоком анализе.',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppTheme.textSecondary,
@@ -369,10 +426,12 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
   }
 
   /// Генерация случайного MTProto secret (32 hex-символа)
+  /// Если включён Fake TLS — добавляет префикс "dd"
   String _generateSecret() {
     final random = dart_math.Random.secure();
     final bytes = List<int>.generate(16, (_) => random.nextInt(256));
-    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return _useFakeTls ? 'dd$hex' : hex;
   }
 
   void _save() {
@@ -386,6 +445,7 @@ class _ProxyConfigScreenState extends State<ProxyConfigScreen> {
         port: int.parse(_portController.text),
         useWebSocket: _useWebSocket,
         webSocketUrl: _useWebSocket ? _wsUrlController.text : null,
+        useFakeTls: _useFakeTls,
       ),
     );
 

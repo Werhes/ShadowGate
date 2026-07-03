@@ -17,6 +17,7 @@ dependencies:
   system_tray: ^2.0.3
   window_manager: ^0.4.3
   url_launcher: ^6.3.2
+  ffi: ^2.1.3
 
 dev_dependencies:
   flutter_test:
@@ -34,3 +35,14 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+
+# Платформенная фильтрация плагинов:
+# system_tray и window_manager работают ТОЛЬКО на Desktop (Windows/macOS/Linux)
+# На Android/iOS они не поддерживаются и должны быть исключены из регистрации
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  windows:
+  web:

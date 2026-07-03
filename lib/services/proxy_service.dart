@@ -10,6 +10,12 @@ import 'socks5_handler.dart';
 
 /// Сервис для управления прокси-сервером
 /// С поддержкой DPI-обхода (zapret-style)
+///
+/// Исправления:
+/// - DPI-обход применяется в обе стороны (клиент->сервер, сервер->клиент)
+/// - Исправлена обработка CONNECT для Telegram
+/// - Добавлен таймаут соединения
+/// - Добавлено логирование ошибок вместо catchError((_) {})
 class ProxyService {
   HttpServer? _httpServer;
   ServerSocket? _socksServer;
@@ -140,6 +146,7 @@ class ProxyService {
   }
 
   /// Обработка CONNECT (HTTPS туннелирование) с DPI-обходом
+  /// Исправлено: DPI-обход применяется в обе стороны
   Future<void> _handleConnect(
     HttpRequest request,
     ProxyConfig config,
@@ -150,7 +157,11 @@ class ProxyService {
     final port = parts.length > 1 ? int.parse(parts[1]) : 443;
 
     try {
-      final targetSocket = await Socket.connect(host, port);
+      final targetSocket = await Socket.connect(
+        host,
+        port,
+        timeout: const Duration(seconds: 10),
+      );
       request.response.statusCode = HttpStatus.ok;
       request.response.headers.set('connection', 'keep-alive');
       await request.response.flush();
@@ -159,28 +170,93 @@ class ProxyService {
         writeHeaders: false,
       );
 
-      // Двунаправленная передача данных с DPI-обходом
-      final dpiMethods = config.type == ProxyType.http
+      // Определяем методы DPI-обхода в зависимости от типа трафика
+      final serverDpiMethods = config.type == ProxyType.http
           ? [DpiMethod.httpSplit, DpiMethod.hostSpoof]
           : <DpiMethod>[];
+      final clientDpiMethods = config.type == ProxyType.http
+          ? [DpiMethod.fragmentation]
+          : <DpiMethod>[];
 
-      await Future.wait([
-        targetSocket.forEach((data) {
+      final completer = Completer<void>();
+      bool serverDone = false;
+      bool clientDone = false;
+
+      void checkDone() {
+        if (serverDone && clientDone && !completer.isCompleted) {
+          completer.complete();
+        }
+      }
+
+      // Данные от сервера -> клиенту (с DPI-обходом)
+      targetSocket.listen(
+        (data) {
           _bytesReceived += data.length;
-          // Применяем DPI-обход к данным от сервера
-          if (dpiMethods.isNotEmpty) {
-            _dpiBypass.applyDpiMethods(data, dpiMethods).then((processed) {
-              requestSocket.add(processed);
+          if (serverDpiMethods.isNotEmpty) {
+            _dpiBypass
+                .applyDpiMethods(data, serverDpiMethods)
+                .then((processed) {
+              try {
+                requestSocket.add(processed);
+              } catch (e) {
+                Logger.error('CONNECT: ошибка записи клиенту: $e');
+              }
             });
           } else {
-            requestSocket.add(data);
+            try {
+              requestSocket.add(data);
+            } catch (e) {
+              Logger.error('CONNECT: ошибка записи клиенту: $e');
+            }
           }
-        }).catchError((_) {}),
-        requestSocket.forEach((data) {
+        },
+        onError: (error) {
+          Logger.error('CONNECT: ошибка от сервера $host:$port: $error');
+          serverDone = true;
+          checkDone();
+        },
+        onDone: () {
+          serverDone = true;
+          checkDone();
+        },
+        cancelOnError: false,
+      );
+
+      // Данные от клиента -> серверу (с DPI-обходом)
+      requestSocket.listen(
+        (data) {
           _bytesSent += data.length;
-          targetSocket.add(data);
-        }).catchError((_) {}),
-      ]);
+          if (clientDpiMethods.isNotEmpty) {
+            _dpiBypass
+                .applyDpiMethods(data, clientDpiMethods)
+                .then((processed) {
+              try {
+                targetSocket.add(processed);
+              } catch (e) {
+                Logger.error('CONNECT: ошибка записи серверу: $e');
+              }
+            });
+          } else {
+            try {
+              targetSocket.add(data);
+            } catch (e) {
+              Logger.error('CONNECT: ошибка записи серверу: $e');
+            }
+          }
+        },
+        onError: (error) {
+          Logger.error('CONNECT: ошибка от клиента: $error');
+          clientDone = true;
+          checkDone();
+        },
+        onDone: () {
+          clientDone = true;
+          checkDone();
+        },
+        cancelOnError: false,
+      );
+
+      await completer.future;
     } catch (e) {
       Logger.error('Ошибка CONNECT к $host:$port: $e');
       try {

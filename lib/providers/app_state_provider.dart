@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart';
 
 import '../core/types.dart';
@@ -5,6 +7,7 @@ import '../models/app_state.dart';
 import '../models/proxy_config.dart';
 import '../models/tun_config.dart';
 import '../services/mtproto_service.dart';
+import '../services/platform_channel_service.dart';
 import '../services/proxy_service.dart';
 import '../services/settings_service.dart';
 import '../services/tun_service.dart';
@@ -13,11 +16,18 @@ import '../utils/logger.dart';
 
 /// Провайдер состояния приложения
 /// Автоматически сохраняет настройки при изменениях
+///
+/// На iOS MTProto прокси запускается через нативный код (NEPacketTunnelProvider),
+/// так как Dart не может держать HTTP-сервер в фоне.
+/// На Android MTProto запускается через Foreground Service (MtprotoService.kt),
+/// чтобы Android не убивал процесс.
+/// На Windows/Desktop MTProto работает через Dart HttpServer.
 class AppStateProvider extends ChangeNotifier {
   final ProxyService _proxyService;
   final TunService _tunService;
   final MtprotoProxyService _mtprotoService;
   final SettingsService _settingsService;
+  final PlatformChannelService _platformChannel;
 
   AppState _state = const AppState();
   bool _initialized = false;
@@ -27,20 +37,38 @@ class AppStateProvider extends ChangeNotifier {
     required ProxyService proxyService,
     required TunService tunService,
     required SettingsService settingsService,
+    required PlatformChannelService platformChannel,
     MtprotoProxyService? mtprotoService,
   })  : _proxyService = proxyService,
         _tunService = tunService,
         _mtprotoService = mtprotoService ?? MtprotoProxyService(),
-        _settingsService = settingsService {
+        _settingsService = settingsService,
+        _platformChannel = platformChannel {
     // Подписываемся на обновления трафика от всех сервисов
     _proxyService.onTrafficUpdate = _onProxyTrafficUpdate;
     _tunService.onTrafficUpdate = _onTunTrafficUpdate;
     _mtprotoService.onTrafficUpdate = _onMtprotoTrafficUpdate;
+
+    // Подписываемся на генерацию secret (MTProto)
+    _mtprotoService.onSecretGenerated = (secret) {
+      _state = _state.copyWith(
+        proxyConfig: _state.proxyConfig.copyWith(mtprotoSecret: secret),
+      );
+      notifyListeners();
+      _settingsService.saveProxyConfig(_state.proxyConfig);
+      Logger.info('MTProto secret сгенерирован и сохранён');
+    };
   }
 
   AppState get state => _state;
   bool get initialized => _initialized;
   AppThemeType get themeType => _themeType;
+
+  /// Использовать нативный MTProto на iOS и Android
+  /// На iOS — через NEPacketTunnelProvider (ShadowTunPlugin)
+  /// На Android — через Foreground Service (MtprotoService.kt)
+  /// На Windows/Desktop — через Dart HttpServer
+  bool get _useNativeMtproto => Platform.isIOS || Platform.isAndroid;
 
   /// Инициализация: загрузка сохранённых настроек
   Future<void> initialize() async {
@@ -72,8 +100,8 @@ class AppStateProvider extends ChangeNotifier {
   /// Обработка обновления трафика от прокси-сервиса
   void _onProxyTrafficUpdate(int sent, int received) {
     _state = _state.copyWith(
-      bytesSent: sent,
-      bytesReceived: received,
+      bytesSent: _state.bytesSent + sent,
+      bytesReceived: _state.bytesReceived + received,
     );
     notifyListeners();
   }
@@ -81,8 +109,8 @@ class AppStateProvider extends ChangeNotifier {
   /// Обработка обновления трафика от TUN-сервиса
   void _onTunTrafficUpdate(int sent, int received) {
     _state = _state.copyWith(
-      bytesSent: sent,
-      bytesReceived: received,
+      bytesSent: _state.bytesSent + sent,
+      bytesReceived: _state.bytesReceived + received,
     );
     notifyListeners();
   }
@@ -90,8 +118,8 @@ class AppStateProvider extends ChangeNotifier {
   /// Обработка обновления трафика от MTProto-сервиса
   void _onMtprotoTrafficUpdate(int sent, int received) {
     _state = _state.copyWith(
-      bytesSent: sent,
-      bytesReceived: received,
+      bytesSent: _state.bytesSent + sent,
+      bytesReceived: _state.bytesReceived + received,
     );
     notifyListeners();
   }
@@ -148,7 +176,7 @@ class AppStateProvider extends ChangeNotifier {
           await _tunService.start(_state.tunConfig);
           break;
         case AppMode.mtproto:
-          await _mtprotoService.start(_state.proxyConfig);
+          await _startMtproto();
           break;
       }
 
@@ -166,6 +194,34 @@ class AppStateProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  /// Запуск MTProto прокси (Dart на Android/Desktop, нативный на iOS)
+  Future<void> _startMtproto() async {
+    if (_useNativeMtproto) {
+      // На iOS запускаем через нативный код
+      final config = _state.proxyConfig;
+      final secret = await _platformChannel.startNativeMtproto({
+        'port': config.port,
+        'secret': config.mtprotoSecret,
+        'webSocketUrl': config.webSocketUrl ?? 'wss://pluto.web.telegram.org/apiws',
+        'useFakeTls': config.useFakeTls,
+      });
+
+      if (secret != null) {
+        // Сохраняем сгенерированный secret
+        _state = _state.copyWith(
+          proxyConfig: _state.proxyConfig.copyWith(mtprotoSecret: secret),
+        );
+        _settingsService.saveProxyConfig(_state.proxyConfig);
+        Logger.info('MTProto secret (native): $secret');
+      } else {
+        throw Exception('Не удалось запустить нативный MTProto прокси');
+      }
+    } else {
+      // На Android/Desktop запускаем через Dart
+      await _mtprotoService.start(_state.proxyConfig);
+    }
   }
 
   /// Остановка сервиса
@@ -187,7 +243,7 @@ class AppStateProvider extends ChangeNotifier {
           await _tunService.stop();
           break;
         case AppMode.mtproto:
-          await _mtprotoService.stop();
+          await _stopMtproto();
           break;
       }
 
@@ -202,6 +258,15 @@ class AppStateProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  /// Остановка MTProto прокси
+  Future<void> _stopMtproto() async {
+    if (_useNativeMtproto) {
+      await _platformChannel.stopNativeMtproto();
+    } else {
+      await _mtprotoService.stop();
+    }
   }
 
   /// Обновление статистики трафика (ручной вызов)
